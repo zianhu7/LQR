@@ -3,12 +3,14 @@ from gym import spaces
 from gym.utils import seeding
 import numpy as np
 from os import path
+from numpy.linalg import inv
 import math
 
-class LQR_Env(gym.Env)
+class LQREnv(gym.Env):
 
-    def __init__(self):
+    def __init__(self, env_params):
         #Normalize Q, R
+        self.params = env_params
         self.rScaling = 1
         self.dim = 2
         self.generate_system()
@@ -22,33 +24,36 @@ class LQR_Env(gym.Env)
         #Make generate_system configurable/randomized
         self.Q = np.eye(self.dim)
         self.R = self.rScaling * np.eye(self.dim)
-        self.eigv = np.random.uniform(low=1.0, high=7.0, size=self.dim)
+        self.eigv = np.random.uniform(low=-1.0, high=1.0, size=self.dim)
+        while np.count_nonzero(self.eigv) != self.dim:
+            self.eigv = np.random.uniform(low=-1.0, high=1.0, size=self.dim)
         #Generate A, B matrices
         P = self.rvs(self.dim)
-        self.A = P @ self.eigv*np.eye @ P.T
+        self.A = P @ self.eigv*np.eye(self.dim) @  P.T
         #Test basic case of B=[[0,0][0,1]]
         self.B = np.zeros((self.dim,self.dim))
         self.B[-1][-1] = 1
 
     def step(self, u):
         new_state = self.A @ self.state + self.B @ u
-        all_zeros = not np.any(new_state)
-        if all_zeros or self.max_episode_steps == self.timestep:
-            done = True
         self.state = new_state
         self.states.append(self.state)
         self.inputs.append(u)
         self.timestep += 1
-        if done: reward = self.calculate_reward()
+        completion = False
+        if self.params["horizon"] == self.timestep:
+            completion = True
+        if completion:
+            reward = self.calculate_reward()
         else: reward = 0
-        return self.state, reward, done, {}
+        return self.state, reward, completion, {}
 
     def reset(self):
         #Assumes reset is called right after __init__
         self.timestep = 0
         rand_values = np.random.randint(low=1, high=100, size=self.dim)
         norm_factor = np.sqrt(sum([e**2 for e in rand_values]))
-        self.state = norm_factor * rand_values.reshape((self.dim, ))
+        self.state = (1 / norm_factor) * rand_values
         self.states.append(self.state)
         self.generate_system()
         return np.array(self.state)
@@ -56,7 +61,7 @@ class LQR_Env(gym.Env)
 ###############################################################################################
 
     #Generate random orthornormal matrix of given dim
-    def rvs(dim):
+    def rvs(self, dim):
          random_state = np.random
          H = np.eye(dim)
          D = np.ones((dim,))
@@ -77,14 +82,14 @@ class LQR_Env(gym.Env)
 
     def ls_estimate(self):
         #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
-        X, Z = np.zeros((self.max_episode_steps, self.dim)), np.zeros((self.max_episode_steps, 2*self.dim))
+        X, Z = np.zeros((self.timestep, self.dim)), np.zeros((self.timestep, 2*self.dim))
         for i in range(self.timestep):
             #x_idx starts at tstep 1
             x_idx, z_idx = i+1, i
             X[i] = self.states[x_idx]
             z_layer = np.hstack([self.states[i], self.inputs[i]])
             Z[i] = z_layer
-        theta = np.inv(Z.T@Z)@(Z.T@X)
+        theta = (inv(Z.T@Z)@(Z.T@X)).T
         #Reshape ensures that for the self.dim=1 case it is still in a matrix form to ensure consistency
         A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
         return A, B
@@ -92,27 +97,28 @@ class LQR_Env(gym.Env)
     def estimate_K(self, A, B):
         Q, R = self.Q, self.R
         #Calculate P matrices first for each step
-        P_matrices = np.zeros((self.max_episode_steps+1, Q.shape[0], Q.shape[1]))
-        P_matrices[self.max_episode_steps] = Q
-        for i in range(self.max_episode_steps-1, 0, -1):
+        P_matrices = np.zeros((self.params["horizon"]+1, Q.shape[0], Q.shape[1]))
+        P_matrices[self.params["horizon"]] = Q
+        for i in range(self.params["horizon"]-1, 0, -1):
             P_t = P_matrices[i+1]
-            P_matrices[i] = Q + (A.T@P_t@A)-(A.T@P_t@B @ np.matmul(np.inv(R+B.T@P_t@B), B.T@P_t@A))
+            P_matrices[i] = Q + (A.T@P_t@A)-(A.T@P_t@B @ np.matmul(inv(R+B.T@P_t@B), B.T@P_t@A))
         #Hardcoded shape of K, change to inferred shape for diverse testing
-        K_matrices = np.zeros((self.max_episode_steps, self.dim, self.dim))
-        for i in range(self.max_episode_steps):
+        K_matrices = np.zeros((self.params["horizon"], self.dim, self.dim))
+        for i in range(self.params["horizon"]):
             P_i = P_matrices[i+1]
-            K_matrices[i] = -np.matmul(np.inv(R+B.T@P_i@B), B.T@P_i@A)
+            K_matrices[i] = -np.matmul(inv(R+B.T@P_i@B), B.T@P_i@A)
         return K_matrices
 
     def calculate_reward(self):
         #Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
-        K_hat = self.estimate_K(self.ls_estimate())
+        A_est, B_est = self.ls_estimate()
+        K_hat = self.estimate_K(A_est, B_est)
         K_true = self.estimate_K(self.A, self.B)
         r_true, r_hat = 0, 0
         #Evolve trajectory based on computing input using both K
         state_true, state_hat = self.states[0], self.states[0]
-        for i in range(self.max_episode_steps):
+        for i in range(self.params["horizon"]):
             #Update r_hat
             u_hat = K_hat[i] @ state_hat
             r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
@@ -124,4 +130,4 @@ class LQR_Env(gym.Env)
         r_hat += state_hat.T @ Q @ state_hat
         r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
-        return -math.abs(r_hat - r_true)
+        return -abs(r_hat - r_true)
