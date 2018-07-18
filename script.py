@@ -25,15 +25,17 @@ def create_env(env_config):
     return env
 
 if __name__ == '__main__':
-    env_params = {"horizon":400}
+    #Ensure that horizon is divisible by exp_length
+    env_params = {"horizon":9, "exp_length":3}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 3
+    num_cpus = 1
     ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
-    config["timesteps_per_batch"] = 10000
+    config["timesteps_per_batch"] = 900
     config["num_sgd_iter"]=10
+    config["num_workers"]=num_cpus
     config["gamma"] = 0.95
-    config["horizon"] = 400
+    config["horizon"] = 100
     config["use_gae"] = False
     config["lambda"] = 0.1
     config["sgd_stepsize"] = .0003
@@ -55,7 +57,8 @@ if __name__ == '__main__':
     #        },
     #    })
     agent = ppo.PPOAgent(config=config, env=env_name)
-    for i in range(5):
+    for i in range(50):
         #import ipdb;ipdb.set_trace()
         result = agent.train()
+        print(result)
 
