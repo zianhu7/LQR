@@ -2,6 +2,7 @@ import numpy as np
 from os import path
 from numpy.linalg import inv
 import math
+from plot import plot_trajectory
 
 class LQRExp():
 
@@ -10,7 +11,7 @@ class LQRExp():
         self.params = exp_params
         self.horizon, self.exp_length = self.params["horizon"], self.params["exp_length"]
         self.rScaling = 1
-        self.dim = 2
+        self.dim = 3
         self.generate_system()
         #Track trajectory
         self.num_exp = int(self.horizon / self.exp_length)
@@ -20,22 +21,26 @@ class LQRExp():
 
     def generate_system(self):
         #Make generate_system configurable/randomized
-        self.Q = np.eye(self.dim)
+        self.Q = 0.001*np.eye(self.dim)
         self.R = self.rScaling * np.eye(self.dim)
-        #self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
+        self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
         #Ensure PD, stable A
-        #while np.count_nonzero(self.eigv) != self.dim:
-            #self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
+        while np.count_nonzero(self.eigv) != self.dim:
+            self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
         #Generate A, B matrices
-        self.eigv = np.array([3,2])
         P = self.rvs(self.dim)
-        self.A = P @ self.eigv*np.eye(self.dim) @  P.T
+        #self.A = P @ self.eigv*np.eye(self.dim) @  P.T
+        self.A = np.array([[1.01,0.01,0],[0.01,1.01,0],[0,0.01,1.01]])
         #Test basic case of B=[[0,0][0,1]]
-        self.B = np.zeros((self.dim,self.dim))
-        self.B[-1][-1] = 1
+        #self.B = np.zeros((self.dim,self.dim))
+        #self.B[-1][-1] = 1
+        self.B = np.eye(self.dim)
 
     def step(self, u):
-        new_state = self.A @ self.state + self.B @ u
+        mu = [0]*self.dim
+        cov = np.eye(self.dim)
+        noise = np.random.multivariate_normal(mu, cov)
+        new_state = self.A @ self.state + self.B @ u + noise
         self.state = new_state
         self.states[self.curr_exp].append(self.state)
         self.inputs[self.curr_exp].append(u)
@@ -93,18 +98,33 @@ class LQRExp():
 
     def ls_estimate(self):
         #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
-        X, Z = np.zeros((self.timestep, self.dim)), np.zeros((self.timestep, 2*self.dim))
+        X, Z = np.zeros((self.num_exp, self.dim)), np.zeros((self.num_exp, 2*self.dim))
         for i in range(self.num_exp):
-            for j in range(self.exp_length):
-                #x_idx starts at tstep 1
-                x_idx, z_idx = j+1, j
-                X[i] = self.states[i][x_idx]
-                z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
-                Z[i] = z_layer
+            j = self.exp_length - 1
+            #x_idx starts at tstep 1
+            x_idx, z_idx = j+1, j
+            X[i] = self.states[i][x_idx]
+            z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
+            Z[i] = z_layer
         theta = (inv(Z.T@Z)@(Z.T@X)).T
         #Reshape ensures that for the self.dim=1 case it is still in a matrix form to ensure consistency
         A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
         return A, B
+
+    #def ls_estimate(self):
+    #    #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
+    #    X, Z = np.zeros((self.timestep, self.dim)), np.zeros((self.timestep, 2*self.dim))
+    #    for i in range(self.num_exp):
+    #        for j in range(self.exp_length):
+    #            #x_idx starts at tstep 1
+    #            x_idx, z_idx = j+1, j
+    #            X[i] = self.states[i][x_idx]
+    #            z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
+    #            Z[i] = z_layer
+    #    theta = (inv(Z.T@Z)@(Z.T@X)).T
+    #    #Reshape ensures that for the self.dim=1 case it is still in a matrix form to ensure consistency
+    #    A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
+    #    return A, B
 
     def estimate_K(self, A, B):
         Q, R = self.Q, self.R
@@ -129,31 +149,66 @@ class LQRExp():
         K_true = self.estimate_K(self.A, self.B)
         r_true, r_hat = 0, 0
         #Evolve trajectory based on computing input using both K
+        synth_traj, true_traj = [[],[]], [[],[]]
         for i in range(self.num_exp):
             state_true, state_hat = self.states[i][0], self.states[i][0]
+            true_traj[0].append(state_true); synth_traj[0].append(state_hat)
             for j in range(self.exp_length):
                 #Update r_hat
                 u_hat = K_hat[i] @ state_hat
+                synth_traj[1].append(u_hat)
                 r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
                 state_hat = A @ state_hat + B @ u_hat
+                synth_traj[0].append(state_hat)
                 #Update r_true
                 u_true = K_true[i] @ state_true
+                true_traj[1].append(u_true)
                 r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
                 state_true = A @ state_true + B @ u_true
+                true_traj[0].append(state_true)
             r_hat += state_hat.T @ Q @ state_hat
             r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
+        reward = -abs(r_hat-r_true)
+        if reward < -10e8:
+            self.synth_trajectory = synth_traj
+            self.true_trajectory = true_traj
         return -abs(r_hat - r_true)
+
+    def check_controllability(self):
+        dim = self.dim
+        stack = []
+        for i in range(dim - 1):
+            term = self.B @ np.linalg.matrix_power(self.A, i)
+            stack.append(term)
+        gramian = np.hstack(stack)
+        return np.linalg.matrix_rank(gramian) == dim
 
     def run_exp(self):
         self.reset()
-        mean = (0,0)
-        cov = [[1,0],[0,1]]
+        import ipdb;ipdb.set_trace()
+        mean = [0]*self.dim
+        cov = np.eye(self.dim)
+        min_reward = 0
         for _ in range(self.horizon):
             input = np.random.multivariate_normal(mean, cov)
             _, reward, _, _ = self.step(input)
-        print(reward)
+            if reward < min_reward: min_reward = reward
+        return min_reward
 
 if __name__ == "__main__":
-    exp_params = {"horizon":50, "exp_length":5}
-    LQRExp(exp_params).run_exp()
+    exp_params = {"horizon":60, "exp_length":10}
+    idx = 0
+    irr_states, irr_inputs = [[],[]], [[],[]]
+    for _ in range(5000):
+        exp = LQRExp(exp_params)
+        min_val = exp.run_exp()
+        if min_val < -10e8:
+            plot_trajectory(exp.true_trajectory[0], exp.true_trajectory[1], idx, 't')
+            plot_trajectory(exp.synth_trajectory[0], exp.synth_trajectory[1], idx, 's')
+            idx += 1
+            irr_states[0].append(exp.true_trajectory[0])
+            irr_states[1].append(exp.synth_trajectory[0])
+            irr_inputs[0].append(exp.true_trajectory[1])
+            irr_inputs[1].append(exp.synth_trajectory[1])
+    import ipdb; ipdb.set_trace()

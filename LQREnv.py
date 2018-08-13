@@ -13,34 +13,36 @@ class LQREnv(gym.Env):
         self.params = env_params
         self.horizon, self.exp_length = self.params["horizon"], self.params["exp_length"]
         self.rScaling = 1
-        self.dim = 2
+        self.dim = 3
         self.generate_system()
         self.action_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.dim,))
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.dim,))
         #Track trajectory
         self.num_exp = int(self.horizon / self.exp_length)
-        self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
-        self.state = None
-
 
     def generate_system(self):
         #Make generate_system configurable/randomized
-        self.Q = np.eye(self.dim)
+        self.Q = 0.001 * np.eye(self.dim)
         self.R = self.rScaling * np.eye(self.dim)
         #self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
         #Ensure PD, stable A
         #while np.count_nonzero(self.eigv) != self.dim:
             #self.eigv = np.random.uniform(low=-1.2, high=1.2, size=self.dim)
         #Generate A, B matrices
-        self.eigv = np.array([3,2])
-        P = self.rvs(self.dim)
-        self.A = P @ self.eigv*np.eye(self.dim) @  P.T
+        #P = self.rvs(self.dim)
+        #self.A = P @ self.eigv*np.eye(self.dim) @  P.T
         #Test basic case of B=[[0,0][0,1]]
-        self.B = np.zeros((self.dim,self.dim))
-        self.B[-1][-1] = 1
+        #Test paper's unstable A
+        self.A = np.array([[1.01,0.01,0],[0.01,1.01,0.01],[0,0.01,1.01]])
+        self.B = np.eye(self.dim)
+
 
     def step(self, u):
-        new_state = self.A @ self.state + self.B @ u
+        mean = [0]*self.dim
+        cov = np.eye(self.dim)
+        noise = np.random.multivariate_normal(mean,cov)
+        normalized_input = (1/100)*u
+        new_state = self.A @ self.state + self.B @ normalized_input + noise
         self.state = new_state
         self.states[self.curr_exp].append(self.state)
         self.inputs[self.curr_exp].append(u)
@@ -69,6 +71,7 @@ class LQREnv(gym.Env):
         self.curr_exp = 0
         rand_values = np.random.randint(low=1, high=100, size=self.dim)
         norm_factor = np.sqrt(sum([e**2 for e in rand_values]))
+        self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
         self.state = (1 / norm_factor) * rand_values
         self.states[self.curr_exp].append(self.state)
         self.generate_system()
@@ -98,14 +101,13 @@ class LQREnv(gym.Env):
 
     def ls_estimate(self):
         #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
-        X, Z = np.zeros((self.timestep, self.dim)), np.zeros((self.timestep, 2*self.dim))
+        X, Z = np.zeros((self.num_exp, self.dim)), np.zeros((self.num_exp, 2*self.dim))
         for i in range(self.num_exp):
-            for j in range(self.exp_length):
-                #x_idx starts at tstep 1
-                x_idx, z_idx = j+1, j
-                X[i] = self.states[i][x_idx]
-                z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
-                Z[i] = z_layer
+            j = self.exp_length - 1
+            x_idx, z_idx = j+1, j
+            X[i] = self.states[i][x_idx]
+            z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
+            Z[i] = z_layer
         theta = (inv(Z.T@Z)@(Z.T@X)).T
         #Reshape ensures that for the self.dim=1 case it is still in a matrix form to ensure consistency
         A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
@@ -133,6 +135,7 @@ class LQREnv(gym.Env):
         K_hat = self.estimate_K(A_est, B_est)
         K_true = self.estimate_K(self.A, self.B)
         r_true, r_hat = 0, 0
+        import ipdb;ipdb.set_trace()
         #Evolve trajectory based on computing input using both K
         for i in range(self.num_exp):
             state_true, state_hat = self.states[i][0], self.states[i][0]
@@ -148,4 +151,6 @@ class LQREnv(gym.Env):
             r_hat += state_hat.T @ Q @ state_hat
             r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
-        return -abs(r_hat - r_true)
+        reward = -abs(r_hat - r_true)
+        #if reward < 10e-6:
+        return reward
