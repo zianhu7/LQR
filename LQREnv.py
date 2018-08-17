@@ -19,6 +19,7 @@ class LQREnv(gym.Env):
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.dim,))
         #Track trajectory
         self.num_exp = int(self.horizon / self.exp_length)
+        self.reward_threshold = self.params["reward_threshold"]
 
     def generate_system(self):
         #Make generate_system configurable/randomized
@@ -41,6 +42,7 @@ class LQREnv(gym.Env):
         mean = [0]*self.dim
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean,cov)
+        #should I normalize actions?
         normalized_input = (1/100)*u
         new_state = self.A @ self.state + self.B @ normalized_input + noise
         self.state = new_state
@@ -55,7 +57,7 @@ class LQREnv(gym.Env):
         if completion:
             reward = self.calculate_reward()
         else: reward = 0
-        return self.state, reward, completion, {}
+        return (1/100)*self.state, reward, completion, {}
 
     def reset_exp(self):
         #Not global reset, only for each experiment
@@ -135,7 +137,6 @@ class LQREnv(gym.Env):
         K_hat = self.estimate_K(A_est, B_est)
         K_true = self.estimate_K(self.A, self.B)
         r_true, r_hat = 0, 0
-        import ipdb;ipdb.set_trace()
         #Evolve trajectory based on computing input using both K
         for i in range(self.num_exp):
             state_true, state_hat = self.states[i][0], self.states[i][0]
@@ -153,4 +154,4 @@ class LQREnv(gym.Env):
         #Negative to turn into maximization problem for RL
         reward = -abs(r_hat - r_true)
         #if reward < 10e-6:
-        return reward
+        return max(reward, self.reward_threshold)
