@@ -5,11 +5,11 @@ import numpy as np
 from os import path
 from numpy.linalg import inv
 import math
+from scipy.linalg import solve_discrete_are as sda
 
 class LQREnv(gym.Env):
 
-    def __init__(self, env_params):
-        #Normalize Q, R
+    def __init__(self, env_params): #Normalize Q, R
         self.params = env_params
         self.horizon, self.exp_length = self.params["horizon"], self.params["exp_length"]
         self.rScaling = 1
@@ -43,7 +43,7 @@ class LQREnv(gym.Env):
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean,cov)
         #should I normalize actions?
-        normalized_input = (1/100)*u
+        normalized_input = u
         new_state = self.A @ self.state + self.B @ normalized_input + noise
         self.state = new_state
         self.states[self.curr_exp].append(self.state)
@@ -57,7 +57,7 @@ class LQREnv(gym.Env):
         if completion:
             reward = self.calculate_reward()
         else: reward = 0
-        return (1/100)*self.state, reward, completion, {}
+        return self.state, reward, completion, {}
 
     def reset_exp(self):
         #Not global reset, only for each experiment
@@ -115,17 +115,23 @@ class LQREnv(gym.Env):
         A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
         return A, B
 
-    def estimate_K(self, A, B):
+    def sda_estimate(self, A, B):
+        Q, R = self.Q, self.R
+        X = sda(A, B, Q, R)
+        K = np.linalg.inv(R + B.T@X@B)@B.T@X@A
+        return -K
+
+    def estimate_K(self, horizon, A, B):
         Q, R = self.Q, self.R
         #Calculate P matrices first for each step
-        P_matrices = np.zeros((self.params["horizon"]+1, Q.shape[0], Q.shape[1]))
-        P_matrices[self.params["horizon"]] = Q
-        for i in range(self.params["horizon"]-1, 0, -1):
+        P_matrices = np.zeros((horizon+1, Q.shape[0], Q.shape[1]))
+        P_matrices[horizon] = Q
+        for i in range(horizon-1, 0, -1):
             P_t = P_matrices[i+1]
             P_matrices[i] = Q + (A.T@P_t@A)-(A.T@P_t@B @ np.matmul(inv(R+B.T@P_t@B), B.T@P_t@A))
         #Hardcoded shape of K, change to inferred shape for diverse testing
-        K_matrices = np.zeros((self.params["horizon"], self.dim, self.dim))
-        for i in range(self.params["horizon"]):
+        K_matrices = np.zeros((horizon, self.dim, self.dim))
+        for i in range(horizon):
             P_i = P_matrices[i+1]
             K_matrices[i] = -np.matmul(inv(R+B.T@P_i@B), B.T@P_i@A)
         return K_matrices
@@ -134,24 +140,41 @@ class LQREnv(gym.Env):
         #Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
         A_est, B_est = self.ls_estimate()
-        K_hat = self.estimate_K(A_est, B_est)
-        K_true = self.estimate_K(self.A, self.B)
+        K_hat = self.sda_estimate(A_est, B_est)
+        K_true = self.sda_estimate(self.A, self.B)
         r_true, r_hat = 0, 0
         #Evolve trajectory based on computing input using both K
-        for i in range(self.num_exp):
-            state_true, state_hat = self.states[i][0], self.states[i][0]
-            for j in range(self.exp_length):
-                #Update r_hat
-                u_hat = K_hat[i] @ state_hat
-                r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
-                state_hat = A @ state_hat + B @ u_hat
-                #Update r_true
-                u_true = K_true[i] @ state_true
-                r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
-                state_true = A @ state_true + B @ u_true
-            r_hat += state_hat.T @ Q @ state_hat
-            r_true += state_true.T @ Q @ state_true
+        #synth_traj, true_traj = [[],[]], [[],[]]
+        #for i in range(self.num_exp):
+            #state_true, state_hat = self.states[i][0], self.states[i][0]
+            #true_traj[0].append(state_true); synth_traj[0].append(state_hat)
+        choice_idx = np.random.choice(self.num_exp, 1)[0]
+        state_true, state_hat = self.states[choice_idx][0], self.states[choice_idx][0]
+        for _ in range(self.exp_length):
+            #Update r_hat
+            u_hat = K_hat @ state_hat
+            r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
+            state_hat = A @ state_hat + B @ u_hat
+            #Update r_true
+            u_true = K_true @ state_true
+            r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
+            state_true = A @ state_true + B @ u_true
+        r_hat += state_hat.T @ Q @ state_hat
+        r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
-        reward = -abs(r_hat - r_true)
-        #if reward < 10e-6:
-        return max(reward, self.reward_threshold)
+        reward = -abs(r_hat-r_true)
+        return max(self.reward_threshold, reward)
+
+    def check_controllability(self):
+        dim = self.dim
+        stack = []
+        for i in range(dim - 1):
+            term = self.B @ np.linalg.matrix_power(self.A, i)
+            stack.append(term)
+        gramian = np.hstack(stack)
+        return np.linalg.matrix_rank(gramian) == dim
+
+    def check_stability(self, control):
+        mat = self.A + self.B @ control
+        return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
+

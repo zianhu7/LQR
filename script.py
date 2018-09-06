@@ -26,12 +26,12 @@ def create_env(env_config):
 
 if __name__ == '__main__':
     #Ensure that horizon is divisible by exp_length
-    env_params = {"horizon":60, "exp_length":10, "reward_threshold":-10e6}
+    env_params = {"horizon":60, "exp_length":6, "reward_threshold":-10}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 3
     ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
-    config["timesteps_per_batch"] = 6000
+    config["timesteps_per_batch"] = 10000
     config["num_sgd_iter"]=10
     config["num_workers"]=num_cpus
     config["gamma"] = 0.95
@@ -59,3 +59,4 @@ if __name__ == '__main__':
     agent = ppo.PPOAgent(config=config, env=env_name)
     for i in range(200):
         result = agent.train()
+        print(result)

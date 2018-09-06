@@ -3,6 +3,7 @@ from os import path
 from numpy.linalg import inv
 import math
 from plot import plot_trajectory
+from scipy.linalg import solve_discrete_are
 
 class LQRExp():
 
@@ -51,9 +52,10 @@ class LQRExp():
         if (self.timestep % self.exp_length == 0) and (not completion):
             self.reset_exp()
         if completion:
-            reward = self.calculate_reward()
-        else: reward = 0
-        return self.state, reward, completion, {}
+            reward, hat_stability, true_stability = self.calculate_reward()
+            stability_info = {"hat_stable": 1-int(hat_stability), "true_stable": 1-int(true_stability)}
+        else: reward, stability_info = 0, {}
+        return self.state, reward, completion, stability_info
 
     def reset_exp(self):
         #Not global reset, only for each experiment
@@ -126,54 +128,57 @@ class LQRExp():
     #    A, B = theta[:,:self.dim].reshape((self.dim, -1)), theta[:,self.dim:].reshape((self.dim, -1))
     #    return A, B
 
-    def estimate_K(self, A, B):
+    def estimate_K(self, horizon, A, B):
         Q, R = self.Q, self.R
         #Calculate P matrices first for each step
-        P_matrices = np.zeros((self.params["horizon"]+1, Q.shape[0], Q.shape[1]))
-        P_matrices[self.params["horizon"]] = Q
-        for i in range(self.params["horizon"]-1, 0, -1):
+        P_matrices = np.zeros((horizon+1, Q.shape[0], Q.shape[1]))
+        P_matrices[horizon] = Q
+        for i in range(horizon-1, 0, -1):
             P_t = P_matrices[i+1]
             P_matrices[i] = Q + (A.T@P_t@A)-(A.T@P_t@B @ np.matmul(inv(R+B.T@P_t@B), B.T@P_t@A))
         #Hardcoded shape of K, change to inferred shape for diverse testing
-        K_matrices = np.zeros((self.params["horizon"], self.dim, self.dim))
-        for i in range(self.params["horizon"]):
+        K_matrices = np.zeros((horizon, self.dim, self.dim))
+        for i in range(horizon):
             P_i = P_matrices[i+1]
             K_matrices[i] = -np.matmul(inv(R+B.T@P_i@B), B.T@P_i@A)
         return K_matrices
+
+    def solve_DARE(self, A, B):
+        Q, R = self.Q, self.R
+        X = solve_discrete_are(A, B, Q, R)
+        K = np.linalg.inv(R + B.T@X@B)@B.T@X@A
+        return -K
 
     def calculate_reward(self):
         #Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
         A_est, B_est = self.ls_estimate()
-        K_hat = self.estimate_K(A_est, B_est)
-        K_true = self.estimate_K(self.A, self.B)
+        K_t =  self.solve_DARE(A, B)
+        K_h = self.solve_DARE(A_est, B_est)
         r_true, r_hat = 0, 0
         #Evolve trajectory based on computing input using both K
-        synth_traj, true_traj = [[],[]], [[],[]]
-        for i in range(self.num_exp):
-            state_true, state_hat = self.states[i][0], self.states[i][0]
-            true_traj[0].append(state_true); synth_traj[0].append(state_hat)
-            for j in range(self.exp_length):
-                #Update r_hat
-                u_hat = K_hat[i] @ state_hat
-                synth_traj[1].append(u_hat)
-                r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
-                state_hat = A @ state_hat + B @ u_hat
-                synth_traj[0].append(state_hat)
-                #Update r_true
-                u_true = K_true[i] @ state_true
-                true_traj[1].append(u_true)
-                r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
-                state_true = A @ state_true + B @ u_true
-                true_traj[0].append(state_true)
-            r_hat += state_hat.T @ Q @ state_hat
-            r_true += state_true.T @ Q @ state_true
+        #synth_traj, true_traj = [[],[]], [[],[]]
+        #for i in range(self.num_exp):
+            #state_true, state_hat = self.states[i][0], self.states[i][0]
+            #true_traj[0].append(state_true); synth_traj[0].append(state_hat)
+        choice_idx = np.random.choice(self.num_exp, 1)[0]
+        stat_true, state_hat = self.states[choice_idx][0], self.states[choice_idx][0]
+        for j in range(self.exp_length):
+            #Update r_hat
+            u_hat = K_h @ state_hat
+            r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
+            state_hat = A @ state_hat + B @ u_hat
+            #Update r_true
+            u_true = K_t @ state_true
+            r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
+            state_true = A @ state_true + B @ u_true
+        r_hat += state_hat.T @ Q @ state_hat
+        r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
         reward = -abs(r_hat-r_true)
-        if reward < -10e8:
-            self.synth_trajectory = synth_traj
-            self.true_trajectory = true_traj
-        return -abs(r_hat - r_true)
+        hat_stability = self.check_instability(K_h)
+        true_stability = self.check_instability(K_t)
+        return reward, hat_stability, true_stability
 
     def check_controllability(self):
         dim = self.dim
@@ -184,31 +189,52 @@ class LQRExp():
         gramian = np.hstack(stack)
         return np.linalg.matrix_rank(gramian) == dim
 
+    def check_instability(self, control):
+        mat = self.A + self.B @ control
+        return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
+
     def run_exp(self):
         self.reset()
-        import ipdb;ipdb.set_trace()
         mean = [0]*self.dim
         cov = np.eye(self.dim)
         min_reward = 0
         for _ in range(self.horizon):
             input = np.random.multivariate_normal(mean, cov)
-            _, reward, _, _ = self.step(input)
+            _, reward, _, stability_info = self.step(input)
             if reward < min_reward: min_reward = reward
-        return min_reward
+        return min_reward, stability_info
 
 if __name__ == "__main__":
-    exp_params = {"horizon":60, "exp_length":10}
-    idx = 0
-    irr_states, irr_inputs = [[],[]], [[],[]]
-    for _ in range(5000):
-        exp = LQRExp(exp_params)
-        min_val = exp.run_exp()
-        if min_val < -10e8:
-            plot_trajectory(exp.true_trajectory[0], exp.true_trajectory[1], idx, 't')
-            plot_trajectory(exp.synth_trajectory[0], exp.synth_trajectory[1], idx, 's')
-            idx += 1
-            irr_states[0].append(exp.true_trajectory[0])
-            irr_states[1].append(exp.synth_trajectory[0])
-            irr_inputs[0].append(exp.true_trajectory[1])
-            irr_inputs[1].append(exp.synth_trajectory[1])
-    import ipdb; ipdb.set_trace()
+    num_rollouts = range(10, 101, 5)
+    rewards, stability = {}, {}
+    stats = {}
+    for nr in num_rollouts:
+        exp_length = 6
+        exp_params = {"horizon":exp_length*nr, "exp_length":exp_length}
+        hat_stable, true_stable, total_reward = 0, 0, 0
+        for _ in range(100):
+            exp = LQRExp(exp_params)
+            reward, stability = exp.run_exp()
+            hat_stable += stability["hat_stable"]
+            true_stable += stability["true_stable"]
+            total_reward += reward
+        stats[exp_length*nr] = [hat_stable/100, true_stable/100, total_reward/100]
+    import ipdb;ipdb.set_trace()
+    #with open('gaussian_results.txt', 'w') as f:
+        #for k,v in stats.items():
+            #f.write(str(k)+" ")
+            #for e in v:
+                #f.write(str(e) + " ")
+            #f.write("\n")
+
+        #'''
+        #if min_val < -10e8:
+            #plot_trajectory(exp.true_trajectory[0], exp.true_trajectory[1], idx, 't')
+            #plot_trajectory(exp.synth_trajectory[0], exp.synth_trajectory[1], idx, 's')
+            #idx += 1
+            #irr_states[0].append(exp.true_trajectory[0])
+            #irr_states[1].append(exp.synth_trajectory[0])
+            #irr_inputs[0].append(exp.true_trajectory[1])
+            #irr_inputs[1].append(exp.synth_trajectory[1])
+    #import ipdb; ipdb.set_trace()
+        #'''
