@@ -11,7 +11,7 @@ class StabilityEnv(gym.Env):
 
     def __init__(self, env_params): #Normalize Q, R
         self.params = env_params
-        self.horizon, self.exp_length = self.params["horizon"], self.params["exp_length"]
+        self.horizon, self.exp_length, self.eigv_high, self.eigv_low = self.params["horizon"], self.params["exp_length"], self.params["eigv_high"], self.params["eigv_low"]
         self.rScaling = 1
         self.dim = 3
         self.generate_system()
@@ -29,13 +29,14 @@ class StabilityEnv(gym.Env):
         self.R = self.rScaling * np.eye(self.dim)
         self.B = np.eye(self.dim)
         inversions = np.random.binomial(1, 0.5, size=self.dim)
-        self.eigv = np.random.uniform(low=1.0+1e-6, high=1.2, size=self.dim)
-        self.eigv = [(1 - inversions[i])*self.eigv[i] for i in range(self.dim)]
+        self.eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+        self.eigv = [self.eigv[i] if inversions[i] else -self.eigv[i] for i in range(len(inversions))]
         A = self.eigv * np.eye(self.dim)
         #Ensure PD A, controllable system
         while not self.check_controllability(A, self.B):
-            self.eigv = np.random.uniform(low=1.0+1e-6, high=1.2, size=self.dim)
-            self.eigv = [(1 - inversions[i])*self.eigv[i] for i in range(self.dim)]
+            self.eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+
+            self.eigv = [self.eigv[i] if inversions[i] else -self.eigv[i] for i in range(len(inversions))]
             A = self.eigv * np.eye(self.dim)
         #Generate A, B matrices
         P = self.rvs(self.dim)

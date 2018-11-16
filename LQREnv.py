@@ -180,6 +180,7 @@ class LQREnv(gym.Env):
         r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
         reward = -abs(r_hat-r_true)
+        print(self.check_stability(K_hat))
         return max(self.reward_threshold, reward)
 
     def check_controllability(self, A, B):
