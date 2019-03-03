@@ -26,7 +26,9 @@ def create_env(env_config):
 
 if __name__ == '__main__':
     #horizon, exp_length upper bounds
-    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0,2], "r_scaling":[0,2], "elem_sample":True}
+    env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
+                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0,2], "r_scaling":[0,2],
+                  "elem_sample":True}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 15
     ray.init(redirect_output=False)
@@ -50,8 +52,9 @@ if __name__ == '__main__':
                 "config": config,
                 "checkpoint_freq": 20, # how often to save model params
                 #"max_failures": 999 # Not worth changing
-                "stop": {"training_iteration": 2000}
-                #"upload_dir": "test_upload_dir"
+                "stop": {"training_iteration": 2000},
+                'upload_dir': "s3://eugene.experiments/cdc_lqr_paper"
+                          "/3-03-2019/LQR_test",
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
