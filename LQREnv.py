@@ -8,7 +8,6 @@ import math
 from scipy.linalg import solve_discrete_are as sda
 
 class LQREnv(gym.Env):
-
     def __init__(self, env_params): #Normalize Q, R
         self.params = env_params
         self.horizon, self.exp_length, self.eigv_low, self.eigv_high = self.params["horizon"], self.params["exp_length"], self.params["eigv_low"], self.params["eigv_high"]
@@ -180,8 +179,9 @@ class LQREnv(gym.Env):
         r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
         reward = -abs(r_hat-r_true)
-        print(self.check_stability(K_hat))
-        return max(self.reward_threshold, reward)
+        self.reward = max(self.reward_threshold, reward)
+        self.stable_res = not self.check_stability(K_hat)
+        return self.reward
 
     def check_controllability(self, A, B):
         dim = self.dim
