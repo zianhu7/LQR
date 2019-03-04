@@ -47,6 +47,11 @@ head_node:
 #        SpotOptions:
 #            MaxPrice: "1.0"
 
+    # You can provision additional disk space with a conf as follows
+    BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+              VolumeSize: 50
     # Additional options in the boto docs.
 
 # Provider-specific config for worker nodes, e.g. instance type. By default
@@ -77,7 +82,8 @@ setup_commands:
     - git clone https://github.com/zianhu7/LQR.git
     - cd LQR && git fetch && git checkout --track origin/workflow_upgrade
     - sudo apt-get update
-    - cd LQR/cpremote_run && pip install -r requirements.txt && python setup.py develop
+    - cd LQR/cpremote_run && pip install -r requirements.txt
+    - cd LQR && python setup.py develop
     # - sudo apt-get -y install libsm6 libxrender1 libfontconfig1
 
 # Custom commands that will be run on the head node after common setup.
