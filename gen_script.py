@@ -28,19 +28,20 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0,2], "r_scaling":[0,2],
-                  "elem_sample": False}
+                  "elem_sample": True}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 12
-    ray.init(redirect_output=False)
+    num_cpus = 35
+    ray.init(redis_address="localhost:6379")
+    # ray.init(num_cpus=4, redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
-    config["num_sgd_iter"]=10
+    config["num_sgd_iter"]=30
     config["num_workers"]=num_cpus
     config["gamma"] = 0.95
     config["horizon"] = env_params["horizon"]
     config["use_gae"] = True
     config["lambda"] = 0.1
-    config["lr"] = grid_search([5e-6])
+    config["lr"] = grid_search([5e-6, 5e-5, 5e-4, 5e-7])
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 
@@ -53,7 +54,8 @@ if __name__ == '__main__':
                 "checkpoint_freq": 20, # how often to save model params
                 #"max_failures": 999 # Not worth changing
                 "stop": {"training_iteration": 2000},
-                'upload_dir': "s3://eugene.experiments/cdc_lqr_paper/3-03-2019/LQR_test",
+                'upload_dir': "s3://ethan.experiments/lqr/3-03-19/lr_sweep",
+                'num_samples': 2,
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
