@@ -4,7 +4,6 @@ from os.path import dirname, realpath
 from setuptools import find_packages, setup, Distribution
 import setuptools.command.build_ext as _build_ext
 import subprocess
-from flow.version import __version__
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
@@ -12,7 +11,7 @@ class BinaryDistribution(Distribution):
 
 setup(
     name='lqr',
-    version=__version__,
+    version='0.0.1',
     distclass=BinaryDistribution,
     packages=find_packages(),
     description=("A fast sampler for Least Squares"),

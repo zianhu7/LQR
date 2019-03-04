@@ -28,9 +28,9 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0,2], "r_scaling":[0,2],
-                  "elem_sample":True}
+                  "elem_sample": False}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 15
+    num_cpus = 12
     ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
