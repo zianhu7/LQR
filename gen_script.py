@@ -11,8 +11,7 @@ env_version_num=0
 env_name = env_name + '-v' + str(env_version_num)
 
 def pass_params_to_gym(env_name):
-    register(
-      id=env_name,
+    register( id=env_name,
       entry_point=("GenLQREnv:GenLQREnv"),
       max_episode_steps=env_params["horizon"],
       kwargs={"env_params":env_params}
