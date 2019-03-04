@@ -11,8 +11,7 @@ env_version_num=0
 env_name = env_name + '-v' + str(env_version_num)
 
 def pass_params_to_gym(env_name):
-    register(
-      id=env_name,
+    register( id=env_name,
       entry_point=("GenLQREnv:GenLQREnv"),
       max_episode_steps=env_params["horizon"],
       kwargs={"env_params":env_params}
@@ -53,7 +52,7 @@ if __name__ == '__main__':
                 "checkpoint_freq": 20, # how often to save model params
                 #"max_failures": 999 # Not worth changing
                 "stop": {"training_iteration": 2000},
-                'upload_dir': "s3://eugene.experiments/cdc_lqr_paper/3-03-2019/LQR_test",
+                'upload_dir': "s3://ethan.experiments/lqr/LQR_test",
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
