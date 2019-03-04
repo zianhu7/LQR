@@ -75,11 +75,10 @@ setup_commands:
     # checkout your desired branch on all worker nodes
     - echo 'export PATH="/home/ubuntu/anaconda3/bin:$PATH"' >> ~/.bashrc
     - git clone https://github.com/zianhu7/LQR.git
-    - cd LQR && git fetch && git checkout --track origin/GenLQR
+    - cd LQR && git fetch && git checkout --track origin/workflow_upgrade
     - sudo apt-get update
-    - sudo apt-get -y install python3-pip
-    - cd LQR/cpremote_run && pip3 install -r requirements.txt
-    - sudo apt-get -y install libsm6 libxrender1 libfontconfig1
+    - cd LQR/cpremote_run && pip install -r requirements.txt && python setup.py
+    # - sudo apt-get -y install libsm6 libxrender1 libfontconfig1
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands:

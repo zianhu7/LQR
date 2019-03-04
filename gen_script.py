@@ -53,8 +53,7 @@ if __name__ == '__main__':
                 "checkpoint_freq": 20, # how often to save model params
                 #"max_failures": 999 # Not worth changing
                 "stop": {"training_iteration": 2000},
-                'upload_dir': "s3://eugene.experiments/cdc_lqr_paper"
-                          "/3-03-2019/LQR_test",
+                'upload_dir': "s3://eugene.experiments/cdc_lqr_paper/3-03-2019/LQR_test",
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
