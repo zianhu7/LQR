@@ -80,7 +80,7 @@ setup_commands:
     # checkout your desired branch on all worker nodes
     - echo 'export PATH="/home/ubuntu/anaconda3/bin:$PATH"' >> ~/.bashrc
     - git clone https://github.com/zianhu7/LQR.git
-    - cd LQR && git fetch && git checkout --track origin/workflow_upgrade
+    - cd LQR && git fetch && git checkout --track origin/master
     - sudo apt-get update
     - cd LQR/cpremote_run && pip install -r requirements.txt
     - cd LQR && python setup.py develop
