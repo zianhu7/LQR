@@ -31,8 +31,8 @@ def gaussian_visualize(file, title, save=False):
     plt.show()
 
 if __name__ == '__main__':
-    f2 = 'rewards_stability_R3_120_5.txt'
-    visualize(f2, 'Rewarding Stability: 1.0-1.5 eigenvalue range (actual)', save=True)
+    f2 = 'rewards_stability_R3_120_30k_2.txt'
+    visualize(f2, 'Rewarding Stability: 1.0-2.0 eigenvalue range', save=True)
 
 
 

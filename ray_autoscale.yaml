@@ -39,7 +39,7 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    InstanceType: c4.4xlarge
+    InstanceType: m4.10xlarge
     ImageId: ami-04b53bf506e95394f # Flow AMI (Ubuntu)
     InstanceMarketOptions:
         MarketType: spot
@@ -47,6 +47,11 @@ head_node:
 #        SpotOptions:
 #            MaxPrice: "1.0"
 
+    # You can provision additional disk space with a conf as follows
+    BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+              VolumeSize: 50
     # Additional options in the boto docs.
 
 # Provider-specific config for worker nodes, e.g. instance type. By default
@@ -54,7 +59,7 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    InstanceType: c4.4xlarge
+    InstanceType: m4.10xlarge
     ImageId: ami-04b53bf506e95394f # Flow AMI (Ubuntu)
 
     #Run workers on spot by default. Comment this out to use on-demand.
@@ -73,12 +78,14 @@ file_mounts: {
 
 setup_commands:
     # checkout your desired branch on all worker nodes
-    - cd flow && git fetch && git checkout `cat /tmp/path`
-    - cd ray && git fetch eugene_upstream && git checkout eugene_upstream/master && git pull eugene_upstream master
-    - echo 'export PATH="/home/ubuntu/sumo/bin:$PATH"' >> ~/.bashrc
-    - echo 'export SUMO_HOME="/home/ubuntu/sumo"' >> ~/.bashrc
-    - echo 'export PYTHONPATH="/home/ubuntu/sumo/tools:$PYTHONPATH"' >> ~/.bashrc
     - echo 'export PATH="/home/ubuntu/anaconda3/bin:$PATH"' >> ~/.bashrc
+    - git clone https://github.com/zianhu7/LQR.git
+    - cd LQR && git fetch && git checkout --track origin/master
+    - sudo apt-get update
+    - cd LQR/cpremote_run && pip install -r requirements.txt
+    - cd LQR && python setup.py develop
+    # - sudo apt-get -y install libsm6 libxrender1 libfontconfig1
+
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands:
     - PATH="/home/ubuntu/anaconda3/bin:$PATH" yes | ~/anaconda3/bin/conda install boto3=1.4.8  # 1.4.8 adds InstanceMarketOptions
