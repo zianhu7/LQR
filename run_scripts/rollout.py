@@ -1,3 +1,4 @@
+'''Used to replay a saved checkpoint'''
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -9,34 +10,32 @@ import os
 import pickle
 
 import gym
-from gym.envs.registration import register
-import ray
+from gym.envs.registration import register 
+import ray 
 from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.models import ModelCatalog
 
-# Example Usage via RLlib CLI:
-# rllib rollout /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
-# --env CartPole-v0 --steps 1000000 --out rollouts.pkl
-# Example Usage via executable:
-# ./rollout.py /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
-# --env CartPole-v0 --steps 1000000 --out rollouts.pkl
+#Example Usage via RLlib CLI:
+    #rllib rollout /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
+    #--env CartPole-v0 --steps 1000000 --out rollouts.pkl
+#Example Usage via executable:
+    #./rollout.py /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
+    #--env CartPole-v0 --steps 1000000 --out rollouts.pkl
 
 env_name = "GenLQREnv"
-env_version_num = 0
+env_version_num=0
 env_name = env_name + '-v' + str(env_version_num)
-
-eigv_low, eigv_high = 1e-6, 1
 
 
 def pass_params_to_gym(env_name):
     register(
-        id=env_name,
-        entry_point=("GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params}
+      id=env_name,
+      entry_point=("GenLQREnv:GenLQREnv"), kwargs={"env_params":env_params}
     )
 
 
 def create_env(env_config):
-    pass_params_to_gym(env_name)
+    pass_params_to_gym(env_name) 
     env = gym.envs.make(env_name)
     return env
 
@@ -46,7 +45,7 @@ def create_parser(parser_creator=None):
     parser = parser_creator(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Roll out a reinforcement learning agent "
-                    "given a checkpoint.")
+        "given a checkpoint.")
 
     parser.add_argument(
         "checkpoint", type=str, help="Checkpoint from which to roll out.")
@@ -56,10 +55,10 @@ def create_parser(parser_creator=None):
         type=str,
         required=True,
         help="The algorithm or model to train. This may refer to the name "
-             "of a built-on algorithm (e.g. RLLib's DQN or PPO), or a "
-             "user-defined trainable function or class registered in the "
-             "tune registry.")
-    required_named.add_argument("--env", type=str, help="The gym environment to use.")
+        "of a built-on algorithm (e.g. RLLib's DQN or PPO), or a "
+        "user-defined trainable function or class registered in the "
+        "tune registry.")
+    required_named.add_argument( "--env", type=str, help="The gym environment to use.")
     parser.add_argument(
         "--no-render",
         default=False,
@@ -69,14 +68,16 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--low", type=float, nargs='+', default=1e-6, help="Low bound for eigenvalue initialization")
-    parser.add_argument("--high", type=float, nargs='+', default=1, help="Low bound for eigenvalue initialization")
+    parser.add_argument("--low", type=float, nargs='+', default=1e-6,
+                        help="Low bound for eigenvalue initialization")
+    parser.add_argument("--high", type=float, nargs='+', default=1,
+                        help="Low bound for eigenvalue initialization")
     parser.add_argument(
         "--config",
         default="{}",
         type=json.loads,
         help="Algorithm-specific configuration (e.g. env, hyperparams). "
-             "Surpresses loading of configuration from checkpoint.")
+        "Supresses loading of configuration from checkpoint.")
     return parser
 
 
@@ -89,13 +90,13 @@ def run(args, parser, env_params):
         if not os.path.exists(config_path):
             config_path = os.path.join(config_dir, "../params.json")
         if not os.path.exists(config_path): raise ValueError(
-            "Could not find params.json in either the checkpoint dir or "
-            "its parent directory.")
+                "Could not find params.json in either the checkpoint dir or "
+                "its parent directory.")
         with open(config_path) as f:
             config = json.load(f)
         if "num_workers" in config:
             config["num_workers"] = min(2, config["num_workers"])
-
+        
     config['num_workers'] = 1
     if not args.env:
         if not config.get("env"):
@@ -124,6 +125,7 @@ def run(args, parser, env_params):
         state = env.reset()
         done = False
         reward_total = 0.0
+        rel_reward = 0
         while not done and steps < (num_steps or steps + 1):
             action = agent.compute_action(state)
             next_state, reward, done, _ = env.step(action)
@@ -136,24 +138,29 @@ def run(args, parser, env_params):
             state = next_state
         if args.out is not None:
             rollouts.append(rollout)
-        with open('gen_es_opnorm_recht.txt', 'a') as f:
-            write_val = str(env.unwrapped.num_exp)+' '+str(env.unwrapped.epsilon_A) + ' '+ str(env.unwrapped.epsilon_B)
-            print(write_val)
-            f.write(write_val)
-            f.write('\n')
+
+        if args.out is not None:
+            with open('{}.txt'.format(args.out), 'w') as f:
+                write_val = str(env.unwrapped.eigv_bound) + ' ' \
+                + str(env.unwrapped.rel_reward) + ' ' + str(env.unwrapped.stable_res)
+                print(write_val)
+                f.write(write_val)
+                f.write('\n')
+
         total_stable += bool(env.unwrapped.stable_res)
         episode_reward += reward_total
         rel_reward += env.unwrapped.rel_reward
-        #print(env.unwrapped.rel_reward)
+        print(env.unwrapped.rel_reward)
     num_episodes = num_steps/env_params["horizon"]
     print(rel_reward/num_episodes, total_stable/num_episodes)
-    if args.out is not None:
-        pickle.dump(rollouts, open(args.out, "wb"))
+
 
 
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":2, "elem_sample":True, "recht_sys":True, "full_ls": False}
+    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10,
+                  "eigv_low":0.5, "eigv_high":2, "q_scaling":[0,1], "r_scaling":[1,1],
+                  "elem_sample":True}
     register_env(env_name, lambda env_config: create_env(env_config))
     run(args, parser, env_params)

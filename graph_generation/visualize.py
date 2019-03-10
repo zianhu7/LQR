@@ -1,3 +1,5 @@
+'''Plot the rewards observed in rewards_stability_R3_120_30k_2'''
+
 from matplotlib import pyplot as plt
 
 def visualize(file, title, save=False):

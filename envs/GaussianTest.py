@@ -1,7 +1,5 @@
 import numpy as np
-from os import path
 from numpy.linalg import inv
-import math
 from plot import plot_trajectory
 from scipy.linalg import solve_discrete_are
 
