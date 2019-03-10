@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "recht_sys": True}
+                  "elem_sample": True, "recht_sys": False}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 1
     #ray.init(redis_address="localhost:6379")
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     config["horizon"] = env_params["horizon"]
     config["use_gae"] = True
     config["lambda"] = 0.1
-    config["lr"] = grid_search([5e-6, 5e-5, 5e-4, 5e-7])
+    config["lr"] = grid_search([5e-6])
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 

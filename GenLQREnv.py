@@ -144,7 +144,6 @@ class GenLQREnv(gym.Env):
                 Z[pos] = z_layer
         try:
             theta = (inv(Z.T@Z)@(Z.T@X)).T
-            #import ipdb;ipdb.set_trace()
         except:
             #import ipdb;ipdb.set_trace()
             with open("err.txt", 'a') as f:
