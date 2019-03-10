@@ -10,9 +10,10 @@ env_name = "GenLQREnv"
 env_version_num=0
 env_name = env_name + '-v' + str(env_version_num)
 
+
 def pass_params_to_gym(env_name):
     register( id=env_name,
-      entry_point=("GenLQREnv:GenLQREnv"),
+      entry_point=("envs.GenLQREnv:GenLQREnv"),
       max_episode_steps=env_params["horizon"],
       kwargs={"env_params":env_params}
     )
@@ -30,8 +31,8 @@ if __name__ == '__main__':
                   "elem_sample": True, "recht_sys": False}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 1
-    #ray.init(redis_address="localhost:6379")
-    ray.init(redirect_output=False)
+    ray.init(redis_address="localhost:6379")
+    # ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
     config["num_sgd_iter"]=10
