@@ -12,9 +12,9 @@ class GenLQREnv(gym.Env):
         self.params = env_params 
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"] 
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
-        self.q_scaling, self.r_scaling = self.params["q_scaling"], self.params["r_scaling"]
         self.dim = 3
         self.es = self.params["elem_sample"]
+        self.recht_sys = self.params["recht_sys"]
         self.generate_system()
         self.action_space = spaces.Box(low=-3, high=3, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
@@ -25,31 +25,30 @@ class GenLQREnv(gym.Env):
 
     def generate_system(self):
         #Make generate_system configurable/randomized
-        #q_factors = np.random.uniform(low=self.q_scaling[0], high=self.q_scaling[1], size=self.dim)
-        #r_factors = np.random.uniform(low=self.r_scaling[0], high=self.r_scaling[1], size=self.dim)
         self.Q, self.R =  0.001 * np.eye(self.dim), np.eye(self.dim)
-        #self.Q, self.R = q_factors*np.eye(self.dim), r_factors*np.eye(self.dim)
-        if not self.es:
-            self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
-            self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
-            self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
-            A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-            #Ensure PD A, controllable system
-            while not self.check_controllability(A, B):
-                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
-                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+        if not self.recht_sys:
+            if not self.es:
+                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
+                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
+                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-            P_A, P_B = self.rvs(self.dim), self.rvs(self.dim) 
-            self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T 
-        else:
-            A = self.sample_matrix(self.eigv_high)
-            B = self.sample_matrix(self.eigv_high)
-            while not self.check_controllability(A, B):
+                #Ensure PD A, controllable system
+                while not self.check_controllability(A, B):
+                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+                    A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
+                P_A, P_B = self.rvs(self.dim), self.rvs(self.dim) 
+                self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T 
+            else:
                 A = self.sample_matrix(self.eigv_high)
                 B = self.sample_matrix(self.eigv_high)
-            self.A, self.B = A, B
-        #self.A = np.array([[1.01,0.01,0],[0.01,1.01,1.01],[0,0.01,1.01]])
-        #self.B = np.eye(self.dim)
+                while not self.check_controllability(A, B):
+                    A = self.sample_matrix(self.eigv_high)
+                    B = self.sample_matrix(self.eigv_high)
+                self.A, self.B = A, B
+        else:
+            self.A = np.array([[1.01,0.01,0],[0.01,1.01,1.01],[0,0.01,1.01]])
+            self.B = np.eye(self.dim)
 
     def step(self, action):
         self.timestep += 1
@@ -135,15 +134,17 @@ class GenLQREnv(gym.Env):
         #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
         #if num_exp == 3 and exp_length == 3:
             #import ipdb;ipdb.set_trace()
-        X, Z = np.zeros((self.num_exp, self.dim)), np.zeros((self.num_exp, 2*self.dim))
+        X, Z = np.zeros((self.horizon, self.dim)), np.zeros((self.horizon, 2*self.dim))
         for i in range(self.num_exp):
-            j = self.exp_length - 1
-            x_idx, z_idx = j+1, j
-            X[i] = self.states[i][x_idx]
-            z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
-            Z[i] = z_layer
+            for j in range(self.exp_length):
+                x_idx, z_idx = j+1, j
+                pos = i*self.exp_length + j
+                X[pos] = self.states[i][x_idx]
+                z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
+                Z[pos] = z_layer
         try:
             theta = (inv(Z.T@Z)@(Z.T@X)).T
+            #import ipdb;ipdb.set_trace()
         except:
             #import ipdb;ipdb.set_trace()
             with open("err.txt", 'a') as f:
