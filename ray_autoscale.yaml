@@ -85,9 +85,9 @@ file_mounts: {
 setup_commands:
     # checkout your desired branch on all worker nodes
     - echo 'export PATH="/home/ubuntu/anaconda3/bin:$PATH"' >> ~/.bashrc
+    - git clone https://github.com/zianhu7/LQR.git
     - cd LQR && conda env create -f environment.yml
     - source activate lqr
-    - git clone https://github.com/zianhu7/LQR.git
     # - cd LQR && git fetch && git checkout --track origin/master
     # - sudo apt-get update
     - cd LQR && python setup.py develop
