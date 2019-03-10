@@ -29,7 +29,7 @@ if __name__ == '__main__':
                   "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0.1,2], "r_scaling":[0.1,2],
                   "elem_sample": True}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 39
+    num_cpus = 38
     ray.init(redis_address="localhost:6379")
     #ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
