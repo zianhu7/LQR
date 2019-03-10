@@ -15,6 +15,7 @@ class GenLQREnv(gym.Env):
         self.dim = 3
         self.es = self.params["elem_sample"]
         self.recht_sys = self.params["recht_sys"]
+        self.full_ls = self.params["full_ls"]
         self.generate_system()
         self.action_space = spaces.Box(low=-3, high=3, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
@@ -134,14 +135,23 @@ class GenLQREnv(gym.Env):
         #NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
         #if num_exp == 3 and exp_length == 3:
             #import ipdb;ipdb.set_trace()
-        X, Z = np.zeros((self.horizon, self.dim)), np.zeros((self.horizon, 2*self.dim))
-        for i in range(self.num_exp):
-            for j in range(self.exp_length):
+        if self.full_ls:
+            X, Z = np.zeros((self.horizon, self.dim)), np.zeros((self.horizon, 2*self.dim))
+            for i in range(self.num_exp):
+                for j in range(self.exp_length):
+                    x_idx, z_idx = j+1, j
+                    pos = i*self.exp_length + j
+                    X[pos] = self.states[i][x_idx]
+                    z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
+                    Z[pos] = z_layer
+        if not self.full_ls:
+            X, Z = np.zeros((self.num_exp, self.dim)), np.zeros((self.num_exp, 2*self.dim))
+            for i in range(self.num_exp):
+                j = self.exp_length - 1
                 x_idx, z_idx = j+1, j
-                pos = i*self.exp_length + j
-                X[pos] = self.states[i][x_idx]
+                X[i] = self.states[i][x_idx]
                 z_layer = np.hstack([self.states[i][z_idx], self.inputs[i][z_idx]])
-                Z[pos] = z_layer
+                Z[i] = z_layer
         try:
             theta = (inv(Z.T@Z)@(Z.T@X)).T
         except:
@@ -212,6 +222,10 @@ class GenLQREnv(gym.Env):
         self.reward = max(self.reward_threshold, reward)
         self.inv_reward = -reward
         self.stable_res = not self.check_stability(K_hat)
+        e_A, _ = np.linalg.eig(A-A_est)
+        e_B, _ = np.linalg.eig(B-B_est)
+        self.epsilon_A = max([abs(e) for e in e_A])
+        self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward
 
     def check_controllability(self, A, B):
