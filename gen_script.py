@@ -26,12 +26,12 @@ def create_env(env_config):
 if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
-                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0,2], "r_scaling":[0,2],
+                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling":[0.1,2], "r_scaling":[0.1,2],
                   "elem_sample": True}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 35
+    num_cpus = 39
     ray.init(redis_address="localhost:6379")
-    # ray.init(num_cpus=4, redirect_output=False)
+    #ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
     config["num_sgd_iter"]=10
@@ -50,11 +50,11 @@ if __name__ == '__main__':
                 "run": "PPO", # name of algorithm
                 "env": "GenLQREnv-v0", # name of env
                 "config": config,
-                "checkpoint_freq": 20, # how often to save model params
+                "checkpoint_freq": 50, # how often to save model params
                 #"max_failures": 999 # Not worth changing
-                "stop": {"training_iteration": 2000},
-                'upload_dir': "s3://ethan.experiments/lqr/3-03-19/lr_sweep",
-                'num_samples': 2,
+                "stop": {"training_iteration": 3000},
+                'upload_dir': "s3://ethan.experiments/lqr/3-10-19/lr_sweep",
+                #'num_samples': 2,
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)

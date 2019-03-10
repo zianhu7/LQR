@@ -16,7 +16,7 @@ class GenLQREnv(gym.Env):
         self.dim = 3
         self.es = self.params["elem_sample"]
         self.generate_system()
-        self.action_space = spaces.Box(low=-2, high=2, shape=(self.dim,))
+        self.action_space = spaces.Box(low=-3, high=3, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.action_offset + (self.params["horizon"] + 1) * self.dim + 2,))
@@ -25,10 +25,10 @@ class GenLQREnv(gym.Env):
 
     def generate_system(self):
         #Make generate_system configurable/randomized
-        q_factors = np.random.uniform(low=self.q_scaling[0], high=self.q_scaling[1], size=self.dim)
-        r_factors = np.random.uniform(low=self.r_scaling[0], high=self.r_scaling[1], size=self.dim)
-        #self.Q, self.R =  0.001 * np.eye(self.dim), np.eye(self.dim)
-        self.Q, self.R = q_factors*np.eye(self.dim), r_factors*np.eye(self.dim)
+        #q_factors = np.random.uniform(low=self.q_scaling[0], high=self.q_scaling[1], size=self.dim)
+        #r_factors = np.random.uniform(low=self.r_scaling[0], high=self.r_scaling[1], size=self.dim)
+        self.Q, self.R =  0.001 * np.eye(self.dim), np.eye(self.dim)
+        #self.Q, self.R = q_factors*np.eye(self.dim), r_factors*np.eye(self.dim)
         if not self.es:
             self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
             self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
@@ -41,8 +41,6 @@ class GenLQREnv(gym.Env):
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
             P_A, P_B = self.rvs(self.dim), self.rvs(self.dim) 
             self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T 
-            #self.A = np.array([[1.01,0.01,0],[0.01,1.01,1.01],[0,0.01,1.01]])
-            #self.B = np.eye(self.dim)
         else:
             A = self.sample_matrix(self.eigv_high)
             B = self.sample_matrix(self.eigv_high)
@@ -50,6 +48,8 @@ class GenLQREnv(gym.Env):
                 A = self.sample_matrix(self.eigv_high)
                 B = self.sample_matrix(self.eigv_high)
             self.A, self.B = A, B
+        #self.A = np.array([[1.01,0.01,0],[0.01,1.01,1.01],[0,0.01,1.01]])
+        #self.B = np.eye(self.dim)
 
     def step(self, action):
         self.timestep += 1
@@ -77,9 +77,7 @@ class GenLQREnv(gym.Env):
     def reset_exp(self):
         #Not global reset, only for each experiment
         self.curr_exp += 1
-        rand_values = np.random.randint(low=1, high=100, size=self.dim)
-        norm_factor = np.sqrt(sum([e**2 for e in rand_values]))
-        new_state = (1 / norm_factor) * rand_values
+        new_state = np.zeros(self.dim)
         self.update_state(new_state)
         self.states[self.curr_exp].append(list(new_state))
 
@@ -101,15 +99,12 @@ class GenLQREnv(gym.Env):
         self.timestep = 0
         self.curr_exp = 0
         #MODIFICATION, change back (only for eigv generalization replay experiment)
-        #self.num_exp = int(np.random.uniform(low=2*self.dim, high=self.num_exp_bound))
-        self.num_exp = self.num_exp_bound
+        self.num_exp = int(np.random.uniform(low=2*self.dim, high=self.num_exp_bound))
         self.exp_length = int(self.params["exp_length"])
         self.horizon = self.num_exp * self.exp_length
-        rand_values = np.random.randint(low=1, high=100, size=self.dim)
-        norm_factor = np.sqrt(sum([e**2 for e in rand_values]))
         self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
         self.create_state()
-        new_state = (1 / norm_factor) * rand_values
+        new_state = np.zeros(self.dim)
         self.update_state(new_state)
         self.states[self.curr_exp].append(list(new_state))
         self.generate_system()
@@ -188,7 +183,7 @@ class GenLQREnv(gym.Env):
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
-            return -1
+            return self.reward_threshold
         K_true = self.sda_estimate(self.A, self.B)
         r_true, r_hat = 0, 0
         #Evolve trajectory based on computing input using both K
@@ -196,17 +191,19 @@ class GenLQREnv(gym.Env):
         #for i in range(self.num_exp):
             #state_true, state_hat = self.states[i][0], self.states[i][0]
             #true_traj[0].append(state_true); synth_traj[0].append(state_hat)
-        choice_idx = np.random.choice(self.num_exp, 1)[0]
-        state_true, state_hat = np.array(self.states[choice_idx][0]), np.array(self.states[choice_idx][0])
+        x0 = np.random.uniform(low=0.1, high=10, size=self.dim)
+        state_true = x0
+        state_hat = np.copy(x0)
         for _ in range(self.exp_length):
             #Update r_hat
+            noise = np.random.multivariate_normal([0]*self.dim, np.eye(self.dim))
             u_hat = K_hat @ state_hat
             r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
-            state_hat = A @ state_hat + B @ u_hat
+            state_hat = A @ state_hat + B @ u_hat + noise
             #Update r_true
             u_true = K_true @ state_true
             r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
-            state_true = A @ state_true + B @ u_true
+            state_true = A @ state_true + B @ u_true + noise
         r_hat += state_hat.T @ Q @ state_hat
         r_true += state_true.T @ Q @ state_true
         #Negative to turn into maximization problem for RL
