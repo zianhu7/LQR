@@ -1,8 +1,8 @@
+'''Reward is stability'''
+
 import gym
 from gym import spaces
-from gym.utils import seeding
 import numpy as np
-from os import path
 from numpy.linalg import inv
 import math
 from scipy.linalg import solve_discrete_are as sda
