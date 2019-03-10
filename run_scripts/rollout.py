@@ -1,4 +1,4 @@
-
+'''Used to replay a saved checkpoint'''
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -26,8 +26,6 @@ env_name = "GenLQREnv"
 env_version_num=0
 env_name = env_name + '-v' + str(env_version_num)
 
-eigv_low, eigv_high = 1e-6, 1
-
 
 def pass_params_to_gym(env_name):
     register(
@@ -40,6 +38,7 @@ def create_env(env_config):
     pass_params_to_gym(env_name) 
     env = gym.envs.make(env_name)
     return env
+
 
 def create_parser(parser_creator=None):
     parser_creator = parser_creator or argparse.ArgumentParser
@@ -69,14 +68,16 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--low", type=float, nargs='+', default=1e-6, help="Low bound for eigenvalue initialization")
-    parser.add_argument("--high", type=float, nargs='+', default=1, help="Low bound for eigenvalue initialization")
+    parser.add_argument("--low", type=float, nargs='+', default=1e-6,
+                        help="Low bound for eigenvalue initialization")
+    parser.add_argument("--high", type=float, nargs='+', default=1,
+                        help="Low bound for eigenvalue initialization")
     parser.add_argument(
         "--config",
         default="{}",
         type=json.loads,
         help="Algorithm-specific configuration (e.g. env, hyperparams). "
-        "Surpresses loading of configuration from checkpoint.")
+        "Supresses loading of configuration from checkpoint.")
     return parser
 
 
@@ -137,27 +138,29 @@ def run(args, parser, env_params):
             state = next_state
         if args.out is not None:
             rollouts.append(rollout)
-        """
-        with open('gen_es_recht.txt', 'a') as f:
-            #write_val = str(env.unwrapped.eigv_bound)+' '+str(env.unwrapped.rel_reward) + ' '+ str(env.unwrapped.stable_res)
-            write_v
-            print(write_val)
-            f.write(write_val)
-            f.write('\n')
-        """
+
+        if args.out is not None:
+            with open('{}.txt'.format(args.out), 'w') as f:
+                write_val = str(env.unwrapped.eigv_bound) + ' ' \
+                + str(env.unwrapped.rel_reward) + ' ' + str(env.unwrapped.stable_res)
+                print(write_val)
+                f.write(write_val)
+                f.write('\n')
+
         total_stable += bool(env.unwrapped.stable_res)
         episode_reward += reward_total
         rel_reward += env.unwrapped.rel_reward
         print(env.unwrapped.rel_reward)
     num_episodes = num_steps/env_params["horizon"]
     print(rel_reward/num_episodes, total_stable/num_episodes)
-    if args.out is not None:
-        pickle.dump(rollouts, open(args.out, "wb"))
+
 
 
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":2, "q_scaling":[0,1], "r_scaling":[1,1], "elem_sample":True}
+    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10,
+                  "eigv_low":0.5, "eigv_high":2, "q_scaling":[0,1], "r_scaling":[1,1],
+                  "elem_sample":True}
     register_env(env_name, lambda env_config: create_env(env_config))
     run(args, parser, env_params)
