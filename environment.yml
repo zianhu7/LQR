@@ -1,7 +1,7 @@
 name: lqr
 
 dependencies:
-    - python==3.6.5
+    - python==3.6.3
     - pip:
       - ray==0.6.3
       - tensorflow==1.13.1
