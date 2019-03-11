@@ -31,7 +31,7 @@ eigv_low, eigv_high = 1e-6, 1
 def pass_params_to_gym(env_name):
     register(
         id=env_name,
-        entry_point=("GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params}
+        entry_point=("envs.GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params}
     )
 
 
@@ -136,17 +136,15 @@ def run(args, parser, env_params):
             state = next_state
         if args.out is not None:
             rollouts.append(rollout)
-        with open('gen_es_opnorm_recht.txt', 'a') as f:
-            write_val = str(env.unwrapped.num_exp)+' '+str(env.unwrapped.epsilon_A) + ' '+ str(env.unwrapped.epsilon_B)
+        with open('generalization_es_rewards_A.txt', 'a') as f:
+            write_val = str(env.unwrapped.max_EA)+' '+str(env.unwrapped.rel_reward) + ' '+ str(env.unwrapped.stable_res)
             print(write_val)
             f.write(write_val)
             f.write('\n')
         total_stable += bool(env.unwrapped.stable_res)
         episode_reward += reward_total
-        rel_reward += env.unwrapped.rel_reward
-        #print(env.unwrapped.rel_reward)
-    num_episodes = num_steps/env_params["horizon"]
-    print(rel_reward/num_episodes, total_stable/num_episodes)
+    #num_episodes = num_steps/env_params["horizon"]
+    #print(rel_reward/num_episodes, total_stable/num_episodes)
     if args.out is not None:
         pickle.dump(rollouts, open(args.out, "wb"))
 
@@ -154,6 +152,6 @@ def run(args, parser, env_params):
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":2, "elem_sample":True, "recht_sys":True, "full_ls": False}
+    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":8, "elem_sample":True, "recht_sys":False, "full_ls": False}
     register_env(env_name, lambda env_config: create_env(env_config))
     run(args, parser, env_params)

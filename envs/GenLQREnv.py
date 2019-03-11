@@ -16,7 +16,7 @@ class GenLQREnv(gym.Env):
         self.es = self.params["elem_sample"]
         self.recht_sys = self.params["recht_sys"]
         self.full_ls = self.params["full_ls"]
-        self.generate_system()
+        #self.generate_system()
         self.action_space = spaces.Box(low=-3, high=3, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
@@ -108,6 +108,10 @@ class GenLQREnv(gym.Env):
         self.update_state(new_state)
         self.states[self.curr_exp].append(list(new_state))
         self.generate_system()
+        e_A, _ = np.linalg.eig(self.A)
+        e_B, _ = np.linalg.eig(self.B)
+        self.max_EA = max([abs(e) for e in e_A])
+        self.max_EB = max([abs(e) for e in e_B])
         return self.state
 
 ###############################################################################################
