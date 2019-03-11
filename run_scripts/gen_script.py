@@ -30,9 +30,9 @@ if __name__ == '__main__':
                   "eigv_low": 0.5, "eigv_high": 2,
                   "elem_sample": True, "recht_sys": False, "full_ls": False}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 38
-    ray.init(redis_address="localhost:6379")
-    #ray.init(redirect_output=False)
+    num_cpus = 1
+    #ray.init(redis_address="localhost:6379")
+    ray.init(redirect_output=False)
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
     config["num_sgd_iter"]=10
@@ -53,9 +53,9 @@ if __name__ == '__main__':
                 "config": config,
                 "checkpoint_freq": 50, # how often to save model params
                 #"max_failures": 999 # Not worth changing
-                "stop": {"training_iteration": 3000}
-                'upload_dir': "s3://ethan.experiments/lqr/3-10-19/lr_sweep",
-                'num_samples': 2
+                "stop": {"training_iteration": 3000},
+                # 'upload_dir': "s3://ethan.experiments/lqr/3-10-19/lr_sweep",
+                'num_samples': 1
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
