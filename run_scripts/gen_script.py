@@ -28,7 +28,7 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "recht_sys": False, "full_ls": False}
+                  "elem_sample": True, "recht_sys": False, "full_ls": True}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 38
     ray.init(redis_address="localhost:6379")
@@ -41,20 +41,20 @@ if __name__ == '__main__':
     config["horizon"] = env_params["horizon"]
     config["use_gae"] = True
     config["lambda"] = 0.1
-    config["lr"] = grid_search([5e-6, 5e-4, 5e-3, 5e-5, 8e-4])
+    config["lr"] = grid_search([6e-4, 7e-4, 2e-3, 9e-4, 3e-3, 4e-3])
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 
 
     trials = run_experiments({
-            "GenLQR_tests": {
+            "GenLQR_tests_R5": {
                 "run": "PPO", # name of algorithm
                 "env": "GenLQREnv-v0", # name of env
                 "config": config,
                 "checkpoint_freq": 50, # how often to save model params
                 #"max_failures": 999 # Not worth changing
                 "stop": {"training_iteration": 3000},
-                'upload_dir': "s3://ethan.experiments/lqr/3-10-19/lr_sweep",
+                'upload_dir': "s3://ethan.experiments/lqr/3-11-19/lr_sweep_2",
                 'num_samples': 1
             }
         })

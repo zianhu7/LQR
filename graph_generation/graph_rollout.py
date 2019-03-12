@@ -14,13 +14,19 @@ from gym.envs.registration import register
 import ray
 from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.models import ModelCatalog
+import plot_suboptimality as ps
 
 # Example Usage via RLlib CLI:
-# rllib rollout /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
-# --env CartPole-v0 --steps 1000000 --out rollouts.pkl
-# Example Usage via executable:
-# ./rollout.py /tmp/ray/checkpoint_dir/checkpoint-0 --run DQN
-# --env CartPole-v0 --steps 1000000 --out rollouts.pkl
+"""
+Generates plots from a checkpoint given the GenLQREnv:
+    1. '--recht' Recht System benchmark as a function of rollout length (mutually exclusive from other graphs, need to separately run)
+    2. '--eigv_gen' Eigenvalue generalization: Relative LQR Cost Suboptimality wrt top eigenvalue of A, Stability of policy wrt top eigenvalue of A; requires --high for eigenvalue bound sampling
+    3. '--opnorm_error' Generates plot of ||A - A_est||_2 as a function of rollout length
+
+REQUIRED:
+    1. '--full_ls' Based on whether trained policy has learned full or partial ls sampling
+    2. If '--eigv_gen' is True, must specify '--gen_num_exp' to fix rollout length for replay
+"""
 
 env_name = "GenLQREnv"
 env_version_num = 0
@@ -30,7 +36,7 @@ env_name = env_name + '-v' + str(env_version_num)
 def pass_params_to_gym(env_name):
     register(
         id=env_name,
-        entry_point=("GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params}
+        entry_point=("envs.GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params}
     )
 
 
@@ -68,10 +74,18 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--low", type=float, nargs='+', default=1e-6,
-                        help="Low bound for eigenvalue initialization")
     parser.add_argument("--high", type=float, nargs='+', default=1,
                         help="Low bound for eigenvalue initialization")
+    parser.add_argument("--recht", type=bool, default=False, 
+                        help="Whether to benchmark on Recht system for R3")
+    parser.add_argument("--eigv_gen", type=bool, default=False,
+                        help="Eigenvalue generalization tests for eigenvalues of A")
+    parser.add_argument("--opnorm_error", type=bool, default=False,
+                        help="Operator norm error of (A-A_est)")
+    parser.add_argument("--full_ls", type=bool, default=True,
+                        help="Sampling type")
+    parser.add_argument("--es", type=bool, default=True, help="Element sampling")
+    parser.add_argument("--gen_num_exp", type=int, default=0, help="Number of experiments per rollout fixed for eigenvalue generalization replay")
     parser.add_argument(
         "--config",
         default="{}",
@@ -79,6 +93,11 @@ def create_parser(parser_creator=None):
         help="Algorithm-specific configuration (e.g. env, hyperparams). "
              "Supresses loading of configuration from checkpoint.")
     return parser
+
+def create_env_params(args):
+    env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0, 
+            "eigv_high": args.high, "elem_sample": args.es, "recht_sys": args.recht, "full_ls":args.full_ls, "gen_num_exp": args.gen_num_exp}
+    return env_params
 
 
 def run(args, parser, env_params):
@@ -97,6 +116,7 @@ def run(args, parser, env_params):
         if "num_workers" in config:
             config["num_workers"] = min(2, config["num_workers"])
 
+    #convert to max cpus available on system
     config['num_workers'] = 1
     if not args.env:
         if not config.get("env"):
@@ -136,31 +156,63 @@ def run(args, parser, env_params):
                 rollout.append([state, action, next_state, reward, done])
             steps += 1
             state = next_state
+        env_obj = env.unwrapped
+        if args.recht:
+            write_val = str(env_obj.num_exp) + ' ' \
+                        + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res)+'\n'
+            if args.out is not None:
+                with open('{}.txt'.format(args.out), 'a') as f:
+                    f.write(write_val)
+            else:
+                with open("recht_benchmark.txt", 'a') as f:
+                    f.write(write_val)
+        if args.eigv_gen:
+            write_val = str(env_obj.max_EA) + ' ' + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
+            if args.out is not None:
+                with open('{}.txt'.format(args.out), 'a') as f:
+                    f.write(write_val)
+            else:
+                with open('eigv_generalization.txt', 'a') as f:
+                    f.write(write_val)
+        if args.opnorm_error:
+            if args.eigv_gen:
+                write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' + str(env_obj.epsilon_B) + '\n'
+            if args.recht:
+                write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' + str(env_obj.epsilon_B) + '\n'
+            if args.out is not None:
+                with open('{}_opnorm_error.txt'.format(args.out), 'a') as f:
+                    f.write(write_val)
+            else:
+                with open('opnorm_error.txt', 'a') as f:
+                    f.write(write_val)
         if args.out is not None:
             rollouts.append(rollout)
-
-        if args.out is not None:
-            with open('{}.txt'.format(args.out), 'w') as f:
-                write_val = str(env.unwrapped.eigv_bound) + ' ' \
-                            + str(env.unwrapped.rel_reward) + ' ' + str(env.unwrapped.stable_res)
-                print(write_val)
-                f.write(write_val)
-                f.write('\n')
-
-        total_stable += bool(env.unwrapped.stable_res)
-        episode_reward += reward_total
-        rel_reward += env.unwrapped.rel_reward
-        print(env.unwrapped.rel_reward)
-    num_episodes = num_steps / env_params["horizon"]
-    print(rel_reward / num_episodes, total_stable / num_episodes)
-
+    if args.recht:
+        if args.out:
+            fname = str(args.out)
+            fname_2 = '{}_opnorm_error.txt'.format(args.out)
+        if not args.out:
+            fname = "recht_benchmark.txt"
+            fname_2 = 'opnorm_error.txt'
+        ps.plot_subopt(fname)
+        ps.plot_stability(fname)
+        if args.opnorm_error:
+            ps.plot_opnorms(fname_2, args.recht)
+    if args.eigv_gen:
+        if args.out:
+            fname = str(args.out)
+            fname_2 = '{}_opnorm_error.txt'.format(args.out)
+        if not args.out:
+            fname = "eigv_generalization.txt"
+            fname_2 = 'opnorm_error.txt'
+        ps.plot_generalization_rewards(fname, args.high)
+        if args.opnorm_error:
+            ps.plot_opnorms(fname_2, False)
 
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10,
-                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling": [0, 1], "r_scaling": [1, 1],
-                  "elem_sample": True}
+    env_params = create_env_params(args)
     register_env(env_name, lambda env_config: create_env(env_config))
     # build the runs against the Recht example
     run(args, parser, env_params)

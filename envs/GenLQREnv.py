@@ -17,7 +17,7 @@ class GenLQREnv(gym.Env):
         self.recht_sys = self.params["recht_sys"]
         self.full_ls = self.params["full_ls"]
         #self.generate_system()
-        self.action_space = spaces.Box(low=-3, high=3, shape=(self.dim,))
+        self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.action_offset + (self.params["horizon"] + 1) * self.dim + 2,))
@@ -99,7 +99,10 @@ class GenLQREnv(gym.Env):
         self.timestep = 0
         self.curr_exp = 0
         #MODIFICATION, change back (only for eigv generalization replay experiment)
-        self.num_exp = int(np.random.uniform(low=2*self.dim, high=self.num_exp_bound))
+        if not self.params["gen_num_exp"]:
+            self.num_exp = int(np.random.uniform(low=2*self.dim, high=self.num_exp_bound))
+        if self.params["gen_num_exp"]:
+            self.num_exp = self.params["gen_num_exp"]
         self.exp_length = int(self.params["exp_length"])
         self.horizon = self.num_exp * self.exp_length
         self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
@@ -205,7 +208,7 @@ class GenLQREnv(gym.Env):
         #for i in range(self.num_exp):
             #state_true, state_hat = self.states[i][0], self.states[i][0]
             #true_traj[0].append(state_true); synth_traj[0].append(state_hat)
-        x0 = np.random.uniform(low=0.1, high=10, size=self.dim)
+        x0 = np.random.multivariate_normal([0]*self.dim, np.eye(self.dim))
         state_true = x0
         state_hat = np.copy(x0)
         for _ in range(self.exp_length):

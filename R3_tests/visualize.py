@@ -1,8 +1,8 @@
 import json
 from matplotlib import pyplot as plt
 
-fpath = "/home/zian/Desktop/research/LQR/R3_tests/gen_es_R3_true/"
-fnames = ["exp_" + str(i) + "/result.json" for i in range(5)]
+fpath = "/home/zian/Desktop/research/LQR/R3_tests/gen_full_ls_3/GenLQR_tests/"
+fnames = ["8e4_full/result.json", "8e4_consts/result.json"]
 #fnames = ["./gen_es_R3/8e4/result.json"]
 
 for i in range(len(fnames)):
