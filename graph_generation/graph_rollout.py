@@ -21,7 +21,7 @@ import plot_suboptimality as ps
 Generates plots from a checkpoint given the GenLQREnv:
     1. '--recht' Recht System benchmark as a function of rollout length (mutually exclusive from other graphs, need to separately run)
     2. '--eigv_gen' Eigenvalue generalization: Relative LQR Cost Suboptimality wrt top eigenvalue of A, Stability of policy wrt top eigenvalue of A; requires --high for eigenvalue bound sampling
-    3. '--opnorm_error' Generates plot of ||A - A_est||_2 as a function of rollout length
+    3. '--opnorm_error' Generates plot of ||A - A_est||_2 as a function of rollout length OR top eigenvalue depending on which of 1. or 2. flags it is run with
 
 REQUIRED:
     1. '--full_ls' Based on whether trained policy has learned full or partial ls sampling
