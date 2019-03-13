@@ -86,6 +86,7 @@ def create_parser(parser_creator=None):
                         help="Sampling type")
     parser.add_argument("--es", type=bool, default=True, help="Element sampling")
     parser.add_argument("--gen_num_exp", type=int, default=0, help="Number of experiments per rollout fixed for eigenvalue generalization replay")
+    parser.add_argument("--gaussian_actions", type=bool, default=False, help="Run env with standard normal actions")
     parser.add_argument(
         "--config",
         default="{}",
@@ -96,7 +97,7 @@ def create_parser(parser_creator=None):
 
 def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0, 
-            "eigv_high": args.high, "elem_sample": args.es, "recht_sys": args.recht, "full_ls":args.full_ls, "gen_num_exp": args.gen_num_exp}
+            "eigv_high": args.high, "elem_sample": args.es, "recht_sys": args.recht, "full_ls":args.full_ls, "gen_num_exp": args.gen_num_exp, "gaussian_actions": args.gaussian_actions}
     return env_params
 
 
@@ -187,6 +188,10 @@ def run(args, parser, env_params):
                     f.write(write_val)
         if args.out is not None:
             rollouts.append(rollout)
+
+    graph(args)
+
+def graph(args):
     if args.recht:
         if args.out:
             fname = str(args.out)

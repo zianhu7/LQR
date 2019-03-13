@@ -16,6 +16,7 @@ class GenLQREnv(gym.Env):
         self.es = self.params["elem_sample"]
         self.recht_sys = self.params["recht_sys"]
         self.full_ls = self.params["full_ls"]
+        self.gaussian_actions = self.params["gaussian_actions"]
         #self.generate_system()
         self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,))
         self.action_offset = self.dim*(self.params["exp_length"]+1)*int(self.params["horizon"]/self.params["exp_length"])
@@ -56,14 +57,16 @@ class GenLQREnv(gym.Env):
         mean = [0]*self.dim
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean,cov)
-        #should I normalize actions?
-        normalized_input = action
+        if self.gaussian_actions:
+            a = np.random.multivariate_normal(mean,cov)
+        if not self.gaussian_actions:
+            a = action
         curr_state = self.states[self.curr_exp][-1]
-        new_state = self.A @ curr_state + self.B @ normalized_input + noise
+        new_state = self.A @ curr_state + self.B @ a + noise
         self.update_state(new_state)
-        self.update_action(action)
+        self.update_action(a)
         self.states[self.curr_exp].append(list(new_state))
-        self.inputs[self.curr_exp].append(action)
+        self.inputs[self.curr_exp].append(a)
         completion = False
         if self.horizon == self.timestep:
             completion = True
