@@ -14,7 +14,7 @@ class GenLQREnv(gym.Env):
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
         self.dim = 3
         self.es = self.params["elem_sample"]
-        self.recht_sys = self.params["recht_sys"]
+        self.eval_matrix = self.params["eval_matrix"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
         #self.generate_system()
@@ -28,7 +28,7 @@ class GenLQREnv(gym.Env):
     def generate_system(self):
         #Make generate_system configurable/randomized
         self.Q, self.R =  0.001 * np.eye(self.dim), np.eye(self.dim)
-        if not self.recht_sys:
+        if not self.eval_matrix:
             if not self.es:
                 self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
                 self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)

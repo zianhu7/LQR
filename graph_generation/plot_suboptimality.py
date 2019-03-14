@@ -78,7 +78,7 @@ def plot_opnorms(fname, iters):
     #y_ticks = np.arange(10e-2,10e2,1)
     #ax.set_ylim([0,10e2])
     #ax.set_yticklabels(y_ticks)
-    plt.title("Operator Norm Error on Recht System")
+    plt.title("Operator Norm Error on Eval System")
     xlabel = "Rollout length" if iters else "Top Eigenvalue of A"
     plt.xlabel(xlabel)
     plt.ylabel("Operator Norm Error")

@@ -19,9 +19,13 @@ import plot_suboptimality as ps
 # Example Usage via RLlib CLI:
 """
 Generates plots from a checkpoint given the GenLQREnv:
-    1. '--recht' Recht System benchmark as a function of rollout length (mutually exclusive from other graphs, need to separately run)
-    2. '--eigv_gen' Eigenvalue generalization: Relative LQR Cost Suboptimality wrt top eigenvalue of A, Stability of policy wrt top eigenvalue of A; requires --high for eigenvalue bound sampling
-    3. '--opnorm_error' Generates plot of ||A - A_est||_2 as a function of rollout length OR top eigenvalue depending on which of 1. or 2. flags it is run with
+    1. '--eval_matrix' System benchmark as a function of rollout length 
+       (mutually exclusive from other graphs, need to separately run)
+    2. '--eigv_gen' Eigenvalue generalization: Relative LQR Cost Suboptimality wrt 
+       top eigenvalue of A, Stability of policy wrt top eigenvalue of A; requires --high for
+       eigenvalue bound sampling
+    3. '--opnorm_error' Generates plot of ||A - A_est||_2 as a function of rollout 
+       length OR top eigenvalue depending on which of 1. or 2. flags it is run with
 
 REQUIRED:
     1. '--full_ls' Based on whether trained policy has learned full or partial ls sampling
@@ -76,8 +80,9 @@ def create_parser(parser_creator=None):
     parser.add_argument("--out", default=None, help="Output filename.")
     parser.add_argument("--high", type=float, nargs='+', default=1,
                         help="Low bound for eigenvalue initialization")
-    parser.add_argument("--recht", type=bool, default=False, 
-                        help="Whether to benchmark on Recht system for R3")
+    parser.add_argument("--eval_matrix", type=bool, default=False,
+                        help="Whether to benchmark on `Sample complexity of quadratic "
+                             "regulator` system for R3")
     parser.add_argument("--eigv_gen", type=bool, default=False,
                         help="Eigenvalue generalization tests for eigenvalues of A")
     parser.add_argument("--opnorm_error", type=bool, default=False,
@@ -85,8 +90,11 @@ def create_parser(parser_creator=None):
     parser.add_argument("--full_ls", type=bool, default=True,
                         help="Sampling type")
     parser.add_argument("--es", type=bool, default=True, help="Element sampling")
-    parser.add_argument("--gen_num_exp", type=int, default=0, help="Number of experiments per rollout fixed for eigenvalue generalization replay")
-    parser.add_argument("--gaussian_actions", type=bool, default=False, help="Run env with standard normal actions")
+    parser.add_argument("--gen_num_exp", type=int, default=0, help="Number of experiments "
+                                                                   "per rollout fixed for eigenvalue"
+                                                                   " generalization replay")
+    parser.add_argument("--gaussian_actions", type=bool, default=False, help="Run env with "
+                                                                             "standard normal actions")
     parser.add_argument(
         "--config",
         default="{}",
@@ -95,9 +103,12 @@ def create_parser(parser_creator=None):
              "Supresses loading of configuration from checkpoint.")
     return parser
 
+
 def create_env_params(args):
-    env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0, 
-            "eigv_high": args.high, "elem_sample": args.es, "recht_sys": args.recht, "full_ls":args.full_ls, "gen_num_exp": args.gen_num_exp, "gaussian_actions": args.gaussian_actions}
+    env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+                  "eigv_high": args.high, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
+                  "full_ls": args.full_ls, "gen_num_exp": args.gen_num_exp,
+                  "gaussian_actions": args.gaussian_actions}
     return env_params
 
 
@@ -117,7 +128,7 @@ def run(args, parser, env_params):
         if "num_workers" in config:
             config["num_workers"] = min(2, config["num_workers"])
 
-    #convert to max cpus available on system
+    # convert to max cpus available on system
     config['num_workers'] = 1
     if not args.env:
         if not config.get("env"):
@@ -158,17 +169,18 @@ def run(args, parser, env_params):
             steps += 1
             state = next_state
         env_obj = env.unwrapped
-        if args.recht:
+        if args.eval_matrix:
             write_val = str(env_obj.num_exp) + ' ' \
-                        + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res)+'\n'
+                        + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
             if args.out is not None:
                 with open('{}.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
             else:
-                with open("recht_benchmark.txt", 'a') as f:
+                with open("eval_matrix_benchmark.txt", 'a') as f:
                     f.write(write_val)
         if args.eigv_gen:
-            write_val = str(env_obj.max_EA) + ' ' + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
+            write_val = str(env_obj.max_EA) + ' ' + str(env_obj.rel_reward) + ' ' \
+                        + str(env_obj.stable_res) + '\n'
             if args.out is not None:
                 with open('{}.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
@@ -177,9 +189,11 @@ def run(args, parser, env_params):
                     f.write(write_val)
         if args.opnorm_error:
             if args.eigv_gen:
-                write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' + str(env_obj.epsilon_B) + '\n'
-            if args.recht:
-                write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' + str(env_obj.epsilon_B) + '\n'
+                write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' \
+                            + str(env_obj.epsilon_B) + '\n'
+            if args.eval_matrix:
+                write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' \
+                            + str(env_obj.epsilon_B) + '\n'
             if args.out is not None:
                 with open('{}_opnorm_error.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
@@ -191,18 +205,19 @@ def run(args, parser, env_params):
 
     graph(args)
 
+
 def graph(args):
-    if args.recht:
+    if args.eval_matrix:
         if args.out:
             fname = str(args.out)
             fname_2 = '{}_opnorm_error.txt'.format(args.out)
         if not args.out:
-            fname = "recht_benchmark.txt"
+            fname = "eval_matrix_benchmark.txt"
             fname_2 = 'opnorm_error.txt'
         ps.plot_subopt(fname)
         ps.plot_stability(fname)
         if args.opnorm_error:
-            ps.plot_opnorms(fname_2, args.recht)
+            ps.plot_opnorms(fname_2, args.eval_matrix)
     if args.eigv_gen:
         if args.out:
             fname = str(args.out)
@@ -214,12 +229,13 @@ def graph(args):
         if args.opnorm_error:
             ps.plot_opnorms(fname_2, False)
 
+
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
     env_params = create_env_params(args)
     register_env(env_name, lambda env_config: create_env(env_config))
-    # build the runs against the Recht example
+    # build the runs against the Eval Matrix example
     run(args, parser, env_params)
 
     # build the runs against top eigenvalue generation
