@@ -28,7 +28,7 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "recht_sys": False, "full_ls": False}
+                  "elem_sample": True, "eval_matrix": False, "full_ls": True}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 38
     ray.init(redis_address="localhost:6379")
@@ -59,7 +59,8 @@ if __name__ == '__main__':
             }
         })
     #agent = ppo.PPOAgent(config=config, env=env_name)
-    #filename = "reward_means_{}_{}.txt".format(env_params["horizon"], str(env_params["eigv_high"]).replace('.','-'))
+    #filename = "reward_means_{}_{}.txt".format(env_params["horizon"],
+                           # str(env_params["eigv_high"]).replace('.','-'))
 
     #for i in range(1000):
         #result = agent.train()

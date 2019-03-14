@@ -136,7 +136,7 @@ def run(args, parser, env_params):
             state = next_state
         if args.out is not None:
             rollouts.append(rollout)
-        with open('gen_full_recht.txt', 'a') as f:
+        with open('gen_full_eval_matrix.txt', 'a') as f:
             write_val = str(env.unwrapped.num_exp)+' '+str(env.unwrapped.rel_reward) + ' '+ str(env.unwrapped.stable_res)
             print(write_val)
             f.write(write_val)
@@ -152,6 +152,6 @@ def run(args, parser, env_params):
 if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
-    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":8, "elem_sample":True, "recht_sys":True, "full_ls": True}
+    env_params = {"horizon":120, "exp_length":6, "reward_threshold":-10, "eigv_low":0.5, "eigv_high":8, "elem_sample":True, "eval_matrix":True, "full_ls": True}
     register_env(env_name, lambda env_config: create_env(env_config))
     run(args, parser, env_params)
