@@ -87,8 +87,10 @@ def plot_opnorms(fname, iters):
     plt.savefig(plot_name)
     plt.show()
 
-def plot_generalization_rewards(fname, eig_high):
-    top_eigs, rel_reward, stability = dict((k,0) for k in range(eig_high*3)), dict((k,0) for k in range(eig_high*3)), dict((k,0) for k in range(eig_high*3))
+def plot_generalization_rewards(fname, eig_high, dim):
+    top_eigs, rel_reward, stability = dict((k,0) for k in range(eig_high * dim)), \
+                                      dict((k,0) for k in range(eig_high * dim)), \
+                                      dict((k,0) for k in range(eig_high * dim))
     for line in open(fname, 'r'):
         data = line.strip().split(' ')
         top_eig, reward, stable = math.ceil(float(data[0])), float(data[1]), bool(data[2])
@@ -108,7 +110,7 @@ def plot_generalization_rewards(fname, eig_high):
     plt.title("Generalization Rewards as a Function of Top Eigenvalue of A")
     plt.xlabel("Maximum Eigenvalue of A")
     plt.ylabel("Relative Reward")
-    plt.savefig("generalization_es_A.png")
+    plt.savefig("output_files/generalization_es_A.png")
     plt.show()
     
 

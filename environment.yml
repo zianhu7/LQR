@@ -10,3 +10,4 @@ dependencies:
       - opencv-python==3.4.3.18
       - redis==2.10.6
       - psutil
+      - matplotlib

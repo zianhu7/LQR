@@ -31,7 +31,7 @@ class GenLQREnv(gym.Env):
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
-        self.dim = 3
+        self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
         self.full_ls = self.params["full_ls"]
@@ -52,14 +52,19 @@ class GenLQREnv(gym.Env):
         self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
         if not self.eval_matrix:
             if not self.es:
-                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
-                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
-                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
+                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low,
+                                                              high=self.eigv_high))
+                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
+                                                size=self.dim)
+                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
+                                                size=self.dim)
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
                 # Ensure PD A, controllable system
                 while not self.check_controllability(A, B):
-                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
-                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
+                                                    size=self.dim)
+                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
+                                                    size=self.dim)
                     A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
                 P_A, P_B = self.rvs(self.dim), self.rvs(self.dim)
                 self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T
