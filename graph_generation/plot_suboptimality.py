@@ -3,8 +3,6 @@ from matplotlib import rc
 import math
 import numpy as np
 
-fname = "../generalization_es_rewards_A.txt"
-
 font = {'size': 18}
 rc('font', **font)
 
@@ -111,7 +109,7 @@ def plot_opnorms(fname, iters, env_params=None):
         # ax.set_ylim([0,10e2])
         # ax.set_yticklabels(y_ticks)
         plt.title("Operator Norm Error on Eval System")
-        xlabel = "Rollout length" if iters else r'$\lambda_{\text{max}}(A)$'
+        xlabel = "Rollout length"
         plt.xlabel(xlabel, labelpad=20)
         plt.ylabel("Median Log Operator Norm Error")
         plt.yscale('log')
@@ -146,11 +144,12 @@ def plot_opnorms(fname, iters, env_params=None):
 
         plt.figure(figsize=(14, 10))
         plt.plot(eig_range, median_EA, linestyle='-', marker='o', color='b')
-        plt.plot(eig_range, median_EB, linestyle='-', marker='r', color='d')
-        plt.title(r'$\text{Operator Norm vs.} \lambda_{\text{max}}(A)$')
-        plt.xlabel("r'\lambda_{\text{max}}(A)'", labelpad=20)
+        plt.plot(eig_range, median_EB, linestyle='-', marker='d', color='r')
+        plt.title('Operator norm vs. top eigenvalue')
+        plt.xlabel('Top eigenvalue', labelpad=20)
         plt.ylabel("Median Log Operator Norm")
         plt.yscale('log')
+        plt.legend([r'$\epsilon_A$', r'$\epsilon_B$'])
         formatter = plt.FuncFormatter(log_10_product)
         ax = plt.gca()
         ax.yaxis.set_major_formatter(formatter)
@@ -168,7 +167,7 @@ def plot_generalization_rewards(fname, eig_high, dim):
         top_eig, reward, stable = math.ceil(float(data[0])), float(data[1]), bool(data[2])
         top_eigs[top_eig] += 1
         rel_reward[top_eig].append(reward)
-        stability[top_eig].append(stable)
+        stability[top_eig] += stable
 
     eig_range, reward, percent_stable = [], [], []
     for k, v in rel_reward.items():
@@ -179,17 +178,15 @@ def plot_generalization_rewards(fname, eig_high, dim):
 
     plt.figure(figsize=(14, 10))
     plt.plot(eig_range, reward, linestyle='-', marker='o', color='b')
-    plt.title(r'$\text{Generalization Rewards vs.} \lambda_{\text{max}}(A)$')
-    plt.xlabel(r'\lambda_{\text{max}}(A)', labelpad=20)
+    plt.title('Reward vs. top eigenvalue')
+    plt.xlabel('Top eigenvalue', labelpad=20)
     plt.ylabel("Median Log Relative Reward")
     plt.yscale('log')
     formatter = plt.FuncFormatter(log_10_product)
     ax = plt.gca()
     ax.yaxis.set_major_formatter(formatter)
     plt.grid(True)
-    plt.savefig("output_files/generalization_es_A.png")
+    plot_name = fname[:-4] + ".png"
+    plt.savefig(plot_name)
     plt.show()
 
-
-if __name__ == "__main__":
-    plot_generalization_rewards(fname, 8)
