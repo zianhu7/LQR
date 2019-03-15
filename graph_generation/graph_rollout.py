@@ -88,9 +88,7 @@ def create_parser(parser_creator=None):
     parser.add_argument("--full_ls", type=bool, default=True,
                         help="Sampling type")
     parser.add_argument("--es", type=bool, default=True, help="Element sampling")
-    parser.add_argument("--gen_num_exp", type=int, default=0, help="Number of experiments "
-                                                                   "per rollout fixed for eigenvalue"
-                                                                   " generalization replay")
+    parser.add_argument("--gen_num_exp", type=int, default=0, help="If 0, the number of experiments is varied")
     parser.add_argument("--gaussian_actions", action="store_true", help="Run env with "
                                                                         "standard normal actions")
     parser.add_argument("--create_all_graphs", action="store_true", help="Create all the"
@@ -170,7 +168,7 @@ def run(args, parser, env_params):
             write_val = str(env_obj.num_exp) + ' ' \
                         + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
             if args.out is not None:
-                with open('output_files/{}.txt'.format(args.out), 'a') as f:
+                with open('output_files/{}_eval_matrix_benchmark.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
             else:
                 if not args.gaussian_actions:
@@ -183,7 +181,7 @@ def run(args, parser, env_params):
             write_val = str(env_obj.max_EA) + ' ' + str(env_obj.rel_reward) + ' ' \
                         + str(env_obj.stable_res) + '\n'
             if args.out is not None:
-                with open('output_files/{}.txt'.format(args.out), 'a') as f:
+                with open('output_files/{}_eigv_generalization.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
             else:
                 if not args.gaussian_actions:
@@ -218,7 +216,7 @@ def run(args, parser, env_params):
 def graph(args, env_params):
     if args.eval_matrix:
         if args.out:
-            fname = str(args.out)
+            fname = "output_files/{}_eval_matrix_benchmark.txt".format(str(args.out))
             fname_2 = 'output_files/{}_opnorm_error.txt'.format(args.out)
         if not args.out:
             fname = "output_files/eval_matrix_benchmark.txt"
@@ -229,15 +227,15 @@ def graph(args, env_params):
             ps.plot_opnorms(fname_2, args.eval_matrix)
     if args.eigv_gen:
         if args.out:
-            fname = str(args.out)
+            fname = "output_files/{}_eigv_generalization.txt".format(str(args.out))
             fname_2 = 'output_files/{}_opnorm_error.txt'.format(args.out)
         if not args.out:
             fname = "output_files/eigv_generalization.txt"
             fname_2 = 'output_files/opnorm_error.txt'
         # ps.plot_stability(fname)
-        ps.plot_generalization_rewards(fname, args.high, int(env_params['dim']))
+        ps.plot_generalization_rewards(fname, int(args.high), int(env_params['dim']))
         if args.opnorm_error:
-            ps.plot_opnorms(fname_2, False)
+            ps.plot_opnorms(fname_2, False, env_params)
 
 
 if __name__ == "__main__":
@@ -253,39 +251,172 @@ if __name__ == "__main__":
             os.remove(os.path.join('output_files/', file))
     env_params = create_env_params(args)
     if args.create_all_graphs:
-        args.eigv_gen = True
+        pass
+        # FIGURE SET 1
+        # Dimension 3, constrained actions
+        # Compare against the evaluation matrix, plot the operator norm error on that matrix
+        args.eigv_gen = False
         args.eval_matrix = True
         args.opnorm_error = True
-
-        # # FIGURE SET 1
+        gaussian_actions = False
+        args.out = 'dim3_full_constrained_eval'
         env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                      "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
+                      "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
                       "full_ls": True, "gen_num_exp": args.gen_num_exp,
-                      "gaussian_actions": False, "dim": 3}
+                      "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
         register_env(env_name, lambda env_config: create_env(env_config))
         args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                        '../trained_policies/full_constrained_R3/checkpoint-2400'))
         args.high = env_params['eigv_high']
-
         run(args, parser, env_params)
+
+        # FIGURE SET 2
+        # Dimension 3, Compare against the evaluation matrix, gaussian actions
+        # args.eigv_gen = False
+        # args.eval_matrix = True
+        # args.opnorm_error = True
+        # gaussian_actions = True
+        # args.out = 'dim3_full_constrained_eval_gauss'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+        #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 3
+        # Dimension 3, constrained actions, only partial LS
+        # Compare against the evaluation matrix
+        # args.eigv_gen = False
+        # args.eval_matrix = True
+        # args.opnorm_error = True
+        # gaussian_actions = False
+        # full_ls = False
+        # args.out = 'dim3_partial_constrained_eval'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+        #               "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/partial_constrained_R3/checkpoint-2430'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 4
+        # Dimension 3, Compare against the evaluation matrix, gaussian actions
+        # args.eigv_gen = False
+        # args.eval_matrix = True
+        # args.opnorm_error = True
+        # gaussian_actions = True
+        # full_ls = False
+        # args.out = 'dim3_partial_constrained_eval_gauss'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+        #               "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/partial_constrained_R3/checkpoint-2430'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 5
+        # Dimension 3, constrained actions
+        # Don't compare against the evaluation matrix
+        # args.eigv_gen = True
+        # args.eval_matrix = False
+        # args.opnorm_error = True
+        # gaussian_actions = False
+        # args.out = 'dim3_full_constrained_gen'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+        #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 4
+        # Dimension 3, constrained actions
+        # Don't compare against the evaluation matrix, gaussian actions
+        # args.eigv_gen = True
+        # args.eval_matrix = False
+        # args.opnorm_error = True
+        # gaussian_actions = True
+        # args.out = 'dim3_full_constrained_no_eval_gauss'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
+        #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 4
+        # args.eigv_gen = False
+        # args.eval_matrix = True
+        # args.opnorm_error = True
+        # gaussian_actions = True
+        # args.out = 'dim3_full_constrained_no_eval'
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
+        #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
+        # FIGURE SET 3
+        # args.eigv_gen = True
+        # args.eval_matrix = False
+        # eval_matrix = False
+        # args.opnorm_error = True
+        # gaussian_actions = False
+        # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": eval_matrix,
+        #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        # register_env(env_name, lambda env_config: create_env(env_config))
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        # args.high = env_params['eigv_high']
+        #
+        # run(args, parser, env_params)
+
 
         # FIGURE SET 2
         # del gym.envs.registry.env_specs["GenLQREnv-v0"] # hack to deregister envs
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/partial_constrained_R3/checkpoint-2430'))
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-        #               "eigv_high": 20.0, "elem_sample": True, "eval_matrix": True,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
         #               "full_ls": False, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": False, "dim": 3}
+        #               "gaussian_actions": False, "dim": 3, "analytic_optimal_cost": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # run(args, parser, env_params)
 
         # FIGURE SET 3
         # del gym.envs.registry.env_specs["GenLQREnv-v0"] # hack to deregister envs
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-        #               "eigv_high": 20.0, "elem_sample": True, "eval_matrix": False,
+        #               "eigv_high": 20, "elem_sample": True, "eval_matrix": False,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": False, "dim": 5}
+        #               "gaussian_actions": False, "dim": 5, "analytic_optimal_cost": True}
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R5/checkpoint-2450'))
         # # args.config = os.path.abspath(os.path.join(os.path.dirname(__file__),
