@@ -255,38 +255,40 @@ if __name__ == "__main__":
         # FIGURE SET 1
         # Dimension 3, constrained actions
         # Compare against the evaluation matrix, plot the operator norm error on that matrix
-        args.eigv_gen = False
-        args.eval_matrix = True
-        args.opnorm_error = True
-        gaussian_actions = False
-        args.out = 'dim3_full_constrained_eval'
-        env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                      "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
-                      "full_ls": True, "gen_num_exp": args.gen_num_exp,
-                      "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
-        register_env(env_name, lambda env_config: create_env(env_config))
-        args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                       '../trained_policies/full_constrained_R3/checkpoint-2400'))
-        args.high = env_params['eigv_high']
-        run(args, parser, env_params)
-
-        # FIGURE SET 2
-        # Dimension 3, Compare against the evaluation matrix, gaussian actions
         # args.eigv_gen = False
         # args.eval_matrix = True
         # args.opnorm_error = True
-        # gaussian_actions = True
-        # args.out = 'dim3_full_constrained_eval_gauss'
+        # gaussian_actions = False
+        # args.out = 'dim3_full_constrained_eval'
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3,
+        #               "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
         # args.high = env_params['eigv_high']
-        #
         # run(args, parser, env_params)
+
+        # FIGURE SET 2
+        # Dimension 3, Compare against the evaluation matrix, gaussian actions
+        args.eigv_gen = False
+        args.eval_matrix = True
+        args.opnorm_error = True
+        gaussian_actions = True
+        args.out = 'dim3_full_constrained_eval_gauss'
+        env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
+                      "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+                      "full_ls": True, "gen_num_exp": args.gen_num_exp,
+                      "gaussian_actions": gaussian_actions, "dim": 3,
+                      "analytic_optimal_cost": True, "eval_mode": True}
+        register_env(env_name, lambda env_config: create_env(env_config))
+        args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                       '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        args.high = env_params['eigv_high']
+
+        run(args, parser, env_params)
 
         # FIGURE SET 3
         # Dimension 3, constrained actions, only partial LS
@@ -300,7 +302,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
         #               "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/partial_constrained_R3/checkpoint-2430'))
@@ -319,7 +321,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
         #               "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/partial_constrained_R3/checkpoint-2430'))
@@ -338,7 +340,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
@@ -357,7 +359,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
@@ -374,7 +376,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
@@ -391,7 +393,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": eval_matrix,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
@@ -407,7 +409,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": True,
         #               "full_ls": False, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": False, "dim": 3, "analytic_optimal_cost": True}
+        #               "gaussian_actions": False, "dim": 3, "analytic_optimal_cost": True, "eval_mode": True}
         # register_env(env_name, lambda env_config: create_env(env_config))
         # run(args, parser, env_params)
 
@@ -416,7 +418,7 @@ if __name__ == "__main__":
         # env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
         #               "eigv_high": 20, "elem_sample": True, "eval_matrix": False,
         #               "full_ls": True, "gen_num_exp": args.gen_num_exp,
-        #               "gaussian_actions": False, "dim": 5, "analytic_optimal_cost": True}
+        #               "gaussian_actions": False, "dim": 5, "analytic_optimal_cost": True, "eval_mode": True}
         # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
         #                                                '../trained_policies/full_constrained_R5/checkpoint-2450'))
         # # args.config = os.path.abspath(os.path.join(os.path.dirname(__file__),

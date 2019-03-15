@@ -37,6 +37,7 @@ class GenLQREnv(gym.Env):
         self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
+        self.eval_mode = self.params["eval_mode"]
         self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
@@ -266,9 +267,15 @@ class GenLQREnv(gym.Env):
         state_true = x0
         state_hat = np.copy(x0)
         if self.analytic_optimal_cost:
-            cov = np.eye(self.dim)
-            r_hat = np.trace(cov @ P_ss_hat)
-            r_true = np.trace(cov @ P_ss_true)
+            is_stable = not self.check_stability(K_hat)
+            if is_stable:
+                cov = np.eye(self.dim)
+                r_hat = np.trace(cov @ P_ss_hat)
+                r_true = np.trace(cov @ P_ss_true)
+            # if we aren't stable under the true dynamics we go off to roughly infinity
+            else:
+                r_hat = 1e6
+                r_true = 1
         else:
             for _ in range(self.exp_length):
                 # Update r_hat
@@ -279,13 +286,17 @@ class GenLQREnv(gym.Env):
                 # Update r_true
                 u_true = K_true @ state_true
                 r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
-                state_true = A3 @ state_true + B @ u_true + noise
+                state_true = A @ state_true + B @ u_true + noise
             r_hat += state_hat.T @ Q @ state_hat
             r_true += state_true.T @ Q @ state_true
         # Negative to turn into maximization problem for RL
         reward = -abs(r_hat - r_true)
         self.rel_reward = (-reward) / abs(r_true)
-        self.reward = max(self.reward_threshold, reward)
+        # Don't hit this when we're creating graphs, only during training
+        if not self.eval_mode:
+            self.reward = max(self.reward_threshold, reward)
+        else:
+            self.reward = reward
         self.inv_reward = -reward
         self.stable_res = not self.check_stability(K_hat)
         _, e_A, _ = np.linalg.svd(A - A_est)
