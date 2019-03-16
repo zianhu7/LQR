@@ -31,7 +31,7 @@ class GenLQREnv(gym.Env):
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
-        self.dim = 3
+        self.dim = 5
         self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
         self.full_ls = self.params["full_ls"]
