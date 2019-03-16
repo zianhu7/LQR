@@ -60,12 +60,6 @@ def create_parser(parser_creator=None):
              "tune registry.")
     required_named.add_argument("--env", type=str, help="The gym environment to use.")
     parser.add_argument(
-        "--no-render",
-        default=False,
-        action="store_const",
-        const=True,
-        help="Surpress rendering of the environment.")
-    parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
     parser.add_argument("--low", type=float, nargs='+', default=1e-6,
@@ -130,8 +124,6 @@ def run(args, parser, env_params):
             action = agent.compute_action(state)
             next_state, reward, done, _ = env.step(action)
             reward_total += reward
-            if not args.no_render:
-                env.render()
             if args.out is not None:
                 rollout.append([state, action, next_state, reward, done])
             steps += 1

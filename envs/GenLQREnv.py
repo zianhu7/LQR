@@ -27,13 +27,18 @@ class GenLQREnv(gym.Env):
             covariance. If false, the Neural Network is used to generate the actions.
         self.reward_threshold: (float)
             The value we clip the reward at.
+        self.analytic_optimal_cost: (bool)
+            If true, we compute the analytic optimal cost for our estimated \hat{K}. If false
+            we just unroll the K for exp_length steps
         '''
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
-        self.dim = 5
+        self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
+        self.eval_mode = self.params["eval_mode"]
+        self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
         # self.generate_system()
@@ -52,14 +57,19 @@ class GenLQREnv(gym.Env):
         self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
         if not self.eval_matrix:
             if not self.es:
-                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low, high=self.eigv_high))
-                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
-                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound, size=self.dim)
+                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low,
+                                                              high=self.eigv_high))
+                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
+                                                size=self.dim)
+                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
+                                                size=self.dim)
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
                 # Ensure PD A, controllable system
                 while not self.check_controllability(A, B):
-                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
-                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high, size=self.dim)
+                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
+                                                    size=self.dim)
+                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
+                                                    size=self.dim)
                     A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
                 P_A, P_B = self.rvs(self.dim), self.rvs(self.dim)
                 self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T
@@ -71,7 +81,7 @@ class GenLQREnv(gym.Env):
                     B = self.sample_matrix(self.eigv_high)
                 self.A, self.B = A, B
         else:
-            self.A = np.array([[1.01, 0.01, 0], [0.01, 1.01, 1.01], [0, 0.01, 1.01]])
+            self.A = np.array([[1.01, 0.01, 0], [0.01, 1.01, 0.01], [0, 0.01, 1.01]])
             self.B = np.eye(self.dim)
 
     def step(self, action):
@@ -205,7 +215,6 @@ class GenLQREnv(gym.Env):
         try:
             theta = (inv(Z.T @ Z) @ (Z.T @ X)).T
         except:
-            # import ipdb;ipdb.set_trace()
             with open("err.txt", 'a') as f:
                 f.write("lse" + '\n')
             return self.A, self.B
@@ -218,7 +227,7 @@ class GenLQREnv(gym.Env):
         Q, R = self.Q, self.R
         X = sda(A, B, Q, R)
         K = np.linalg.inv(R + B.T @ X @ B) @ B.T @ X @ A
-        return -K
+        return X, -K
 
     def estimate_K(self, horizon, A, B):
         '''Solve for K recursively. Not used.'''
@@ -242,12 +251,12 @@ class GenLQREnv(gym.Env):
         Q, R, A, B = self.Q, self.R, self.A, self.B
         A_est, B_est = self.ls_estimate()
         try:
-            K_hat = self.sda_estimate(A_est, B_est)
+            P_ss_hat, K_hat = self.sda_estimate(A_est, B_est)
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
             return self.reward_threshold
-        K_true = self.sda_estimate(self.A, self.B)
+        P_ss_true, K_true = self.sda_estimate(self.A, self.B)
         r_true, r_hat = 0, 0
         # Evolve trajectory based on computing input using both K
         # synth_traj, true_traj = [[],[]], [[],[]]
@@ -257,26 +266,41 @@ class GenLQREnv(gym.Env):
         x0 = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
         state_true = x0
         state_hat = np.copy(x0)
-        for _ in range(self.exp_length):
-            # Update r_hat
-            noise = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
-            u_hat = K_hat @ state_hat
-            r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
-            state_hat = A @ state_hat + B @ u_hat + noise
-            # Update r_true
-            u_true = K_true @ state_true
-            r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
-            state_true = A @ state_true + B @ u_true + noise
-        r_hat += state_hat.T @ Q @ state_hat
-        r_true += state_true.T @ Q @ state_true
+        if self.analytic_optimal_cost:
+            is_stable = not self.check_stability(K_hat)
+            if is_stable:
+                cov = np.eye(self.dim)
+                r_hat = np.trace(cov @ P_ss_hat)
+                r_true = np.trace(cov @ P_ss_true)
+            # if we aren't stable under the true dynamics we go off to roughly infinity
+            else:
+                r_hat = 1e6
+                r_true = 1
+        else:
+            for _ in range(self.exp_length):
+                # Update r_hat
+                noise = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
+                u_hat = K_hat @ state_hat
+                r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
+                state_hat = A @ state_hat + B @ u_hat + noise
+                # Update r_true
+                u_true = K_true @ state_true
+                r_true += state_true.T @ Q @ state_true + u_true.T @ R @ u_true
+                state_true = A @ state_true + B @ u_true + noise
+            r_hat += state_hat.T @ Q @ state_hat
+            r_true += state_true.T @ Q @ state_true
         # Negative to turn into maximization problem for RL
         reward = -abs(r_hat - r_true)
         self.rel_reward = (-reward) / abs(r_true)
-        self.reward = max(self.reward_threshold, reward)
+        # Don't hit this when we're creating graphs, only during training
+        if not self.eval_mode:
+            self.reward = max(self.reward_threshold, reward)
+        else:
+            self.reward = reward
         self.inv_reward = -reward
         self.stable_res = not self.check_stability(K_hat)
-        e_A, _ = np.linalg.eig(A - A_est)
-        e_B, _ = np.linalg.eig(B - B_est)
+        _, e_A, _ = np.linalg.svd(A - A_est)
+        _, e_B, _ = np.linalg.svd(B - B_est)
         self.epsilon_A = max([abs(e) for e in e_A])
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward

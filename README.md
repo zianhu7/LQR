@@ -10,11 +10,13 @@ the needed libraries and appends the environments to the path. Then, the script 
 `gen_script.py` which will run the training for the sampler.
 
 If you do not have conda, run `pip install -r requirements.txt` and then rnu `python setup.py
-develop`.
+develop`. This method is not as extensively tested as the conda install.
 
 ## Generating the graphs
 In the spirit of reproducibility, we've uploaded all of the trained models to this repository.
-To run one of the trained models and generate all the graphs for the paper, run `TBD`
+To run one of the trained models examine `graph_generation/graph_rollouts.py`.
+To generate all the graphs for the paper, run
+`python graph_generation/figs_for_paper`
 
 ## Understanding the codebase
 The main file is GenLQREnv.py which contains the environment used for training.
@@ -22,9 +24,9 @@ For each "horizon" number of steps it samples random A and B matrices, allows th
 N rollouts of length `exp_length` where N=horizon/exp_length, and at the end uses the input, output
 pairs to do a Least Squares estimation of A and B. The Ricatti equation is then solved to
 generate a feedback matrix that is used to rollout for horizon steps and compute the LQR cost.
-The  main parameters used to control it are the dimension (which, unfortunately
-needs to be set manually as it was mistakenly hard-coded in) and the following environment
+The  main parameters used to control it are the dimension and the following environment
 configs that can be set in `gen_script.py`
+- 'dim': Dimension of the square A and B matrices. dim=3 -> 3x3 matrices.
 - 'elem_sample': if true all the elements of A and B are randomly sampled, if false eigenvalues
 are sampled and then rotation matrices are applied.
 - 'eval_matrix': this references the Q and R matrices that were taken from "On The Sample Complexity

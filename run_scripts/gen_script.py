@@ -28,7 +28,9 @@ if __name__ == '__main__':
     #horizon, exp_length upper bounds
     env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "eval_matrix": False, "full_ls": True, "gaussian_actions": False, "gen_num_exp":0}
+                  "elem_sample": True, "eval_matrix": False, "full_ls": True,
+                  "dim": 5, "eval_mode": False, "analytic_optimal_cost": False, "gaussian_actions": False, "gen_num_exp": 0}
+>>>>>>> 5c7b4fcbd8644748306c992546aec5bec3b9a1f4
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 38
     ray.init(redis_address="localhost:6379")
