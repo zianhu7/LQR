@@ -16,7 +16,7 @@ develop`. This method is not as extensively tested as the conda install.
 In the spirit of reproducibility, we've uploaded all of the trained models to this repository.
 To run one of the trained models examine `graph_generation/graph_rollouts.py`.
 To generate all the graphs for the paper, run
-`python graph_generation/figs_for_paper`
+`python graph_generation/figs_for_paper.py`
 
 ## Understanding the codebase
 The main file is GenLQREnv.py which contains the environment used for training.
