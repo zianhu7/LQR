@@ -28,9 +28,9 @@ The  main parameters used to control it are the dimension and the following envi
 configs that can be set in `gen_script.py`
 - 'dim': Dimension of the square A and B matrices. dim=3 -> 3x3 matrices.
 - 'elem_sample': if true all the elements of A and B are randomly sampled, if false eigenvalues
-are sampled and then rotation matrices are applied.
+are sampled and then unitary matrices are applied to generate the A and B matrices. In the experiments in the paper, elem_sample is always set to true. 
 - 'eval_matrix': this references the Q and R matrices that were taken from "On The Sample Complexity
-    Of The Linear Quadratic Regulator"
+    Of The Linear Quadratic Regulator". 
 - 'eigv_high': If 'elem_sample' is true the eigenvalues are bounded between -eigv_high and eigv_high.
     If 'elem_sample' is false this is the maximum eigenvalue of the sampled matrices.
 - 'eigv_low': If 'elem_sample' is false, this is the minimal eigenvalue of the sampled matrices.
