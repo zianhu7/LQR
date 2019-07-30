@@ -1,10 +1,14 @@
+import datetime
+
 import gym
 from gym.envs.registration import register
-
+import numpy as np
 import ray
 import ray.rllib.agents.ppo.ppo as ppo
 from ray.tune.registry import register_env
-from ray.tune import run_experiments, grid_search
+from ray.tune import run, grid_search
+
+from utils.parsers import GenLQRParser
 
 env_name = "GenLQREnv" 
 env_version_num=0
@@ -25,50 +29,47 @@ def create_env(env_config):
     return env
 
 if __name__ == '__main__':
-    #horizon, exp_length upper bounds
-    env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
-                  "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "eval_matrix": False, "full_ls": True,
-                  "dim": 5, "eval_mode": False, "analytic_optimal_cost": False, "gaussian_actions": False, "gen_num_exp": 0}
->>>>>>> 5c7b4fcbd8644748306c992546aec5bec3b9a1f4
+    parser = GenLQRParser()
+    args = parser.parse_args()
+
+    env_params = {"horizon": args.horizon, "exp_length": args.exp_length,
+                  "reward_threshold":-np.abs(args.reward_threshold),
+                  "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
+                  "elem_sample": args.elem_sample, "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
+                  "dim": args.dim, "eval_mode": args.eval_mode, "analytic_optimal_cost": args.analytic_optimal_cost,
+                  "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 38
-    ray.init(redis_address="localhost:6379")
-    # ray.init(redirect_output=False)
+    num_cpus = args.num_cpus
+    if args.multi_node:
+        ray.init(redis_address="localhost:6379")
+    else:
+        ray.init()
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
     config["num_sgd_iter"]=10
-    config["num_workers"]=num_cpus
+    config["num_workers"] = args.num_cpus
     config["gamma"] = 0.95
-    config["horizon"] = env_params["horizon"]
+    config["horizon"] = args.horizon
     config["use_gae"] = True
     config["lambda"] = 0.1
     config["lr"] = grid_search([5e-4, 8e-4, 5e-3, 5e-5, 1e-3, 1e-4, 8e-5, 1e-4, 9e-4, 2e-3])
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 
+    s3_string = "s3://eugene.experiments/trb_bottleneck_paper/" \
+                + datetime.now().strftime("%m-%d-%Y") + '/' + args.exp_title
+    config['env'] = env_name
+    exp_dict = {
+        'name': args.exp_title,
+        'run_or_experiment': 'PPO',
+        'checkpoint_freq': args.checkpoint_freq,
+        'stop': {
+            'training_iteration': args.num_iters
+        },
+        'config': config,
+        'num_samples': args.num_samples,
+    }
+    if args.use_s3:
+        exp_dict['upload_dir'] = s3_string
 
-    trials = run_experiments({
-            "GenLQR_R5_full_constrained": {
-                "run": "PPO", # name of algorithm
-                "env": "GenLQREnv-v0", # name of env
-                "config": config,
-                "checkpoint_freq": 30, # how often to save model params
-                #"max_failures": 999 # Not worth changing
-                "stop": {"training_iteration": 3000},
-                'upload_dir': "s3://ethan.experiments/lqr/3-15-19/full_const_R5",
-                'num_samples': 1
-            }
-        })
-    #agent = ppo.PPOAgent(config=config, env=env_name)
-    #filename = "reward_means_{}_{}.txt".format(env_params["horizon"],
-                           # str(env_params["eigv_high"]).replace('.','-'))
-
-    #for i in range(1000):
-        #result = agent.train()
-        #print('-'*60)
-        #print("Epoch:" + str(i))
-        #print(result["episode_reward_mean"])
-        #print('-'*60)
-        #with open(filename, 'a') as f:
-            #f.write(str(result["episode_reward_mean"])+'\n')
+    run(**exp_dict, queue_trials=True)

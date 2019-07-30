@@ -1,10 +1,10 @@
-import gym
-from gym import spaces
-from gym.utils import seeding
-import numpy as np
-from os import path
-from numpy.linalg import inv
 import math
+
+import gym
+import numpy as np
+import scipy
+from gym import spaces
+from numpy.linalg import inv
 from scipy.linalg import solve_discrete_are as sda
 
 
@@ -41,8 +41,11 @@ class GenLQREnv(gym.Env):
         self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
-        # self.generate_system()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,))
+        self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
+
+        # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
+        # an actual Gaussian with covariance being the identity matrix.
+        self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
         self.action_offset = self.dim * (self.params["exp_length"] + 1) * int(
             self.params["horizon"] / self.params["exp_length"])
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
@@ -54,6 +57,8 @@ class GenLQREnv(gym.Env):
     def generate_system(self):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
         # Make generate_system configurable/randomized
+
+        # TODO(@evinitsky) switch the conditions from observability and controllability to stabilizable/detectable
         self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
         if not self.eval_matrix:
             if not self.es:
@@ -64,8 +69,9 @@ class GenLQREnv(gym.Env):
                 self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
                                                 size=self.dim)
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
+                Q_sqrt = scipy.linalg.sqrtm(self.Q)
                 # Ensure PD A, controllable system
-                while not self.check_controllability(A, B):
+                while not self.check_controllability(A, B) and not self.check_observability(A, Q_sqrt):
                     self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
                                                     size=self.dim)
                     self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
@@ -76,7 +82,8 @@ class GenLQREnv(gym.Env):
             else:
                 A = self.sample_matrix(self.eigv_high)
                 B = self.sample_matrix(self.eigv_high)
-                while not self.check_controllability(A, B):
+                Q_sqrt = scipy.linalg.sqrtm(self.Q)
+                while not self.check_controllability(A, B) and not self.check_observability(A, Q_sqrt):
                     A = self.sample_matrix(self.eigv_high)
                     B = self.sample_matrix(self.eigv_high)
                 self.A, self.B = A, B
@@ -117,7 +124,7 @@ class GenLQREnv(gym.Env):
             reward = self.calculate_reward()
         else:
             reward = 0
-        return self.state, reward, completion, {}
+        return self.state / self.obs_norm, reward, completion, {}
 
     def reset_exp(self):
         '''Restarts the rollout process for a given experiment'''
@@ -149,11 +156,10 @@ class GenLQREnv(gym.Env):
         '''Reset the A and B matrices, reset the state matrix'''
         self.timestep = 0
         self.curr_exp = 0
-        # MODIFICATION, change back (only for eigv generalization replay experiment)
-        if not self.params["gen_num_exp"]:
+        if self.params["rand_num_exp"]:
             self.num_exp = int(np.random.uniform(low=2 * self.dim, high=self.num_exp_bound))
-        if self.params["gen_num_exp"]:
-            self.num_exp = self.params["gen_num_exp"]
+        else:
+            self.num_exp = self.num_exp_bound
         self.exp_length = int(self.params["exp_length"])
         self.horizon = self.num_exp * self.exp_length
         self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
@@ -305,15 +311,34 @@ class GenLQREnv(gym.Env):
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward
 
-    def check_controllability(self, A, B):
-        '''Check that the controllability matrix is full rank'''
+    def check_observability(self, A, C):
+        """Check that the observability matrix is full rank.
+           We check this by using the standard condition that
+           [C
+            CA
+            CA^2
+            .
+            .
+            .
+            CA^{n-1}] is full rank
+        """
         dim = self.dim
         stack = []
-        for i in range(dim - 1):
+        for i in range(dim):
+            term = C @ np.linalg.matrix_power(A, i)
+            stack.append(term)
+        obs_grammian = np.vstack(stack)
+        return np.linalg.matrix_rank(obs_grammian) == dim
+
+    def check_controllability(self, A, B):
+        """Check that the controllability matrix [B, BA, ..., BA^{n-1}] is full rank"""
+        dim = self.dim
+        stack = []
+        for i in range(dim):
             term = B @ np.linalg.matrix_power(A, i)
             stack.append(term)
-        gramian = np.hstack(stack)
-        return np.linalg.matrix_rank(gramian) == dim
+        grammian = np.hstack(stack)
+        return np.linalg.matrix_rank(grammian) == dim
 
     def check_stability(self, control):
         '''Confirm that the feedback matrix stabilizes the system'''
