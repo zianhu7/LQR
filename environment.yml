@@ -14,4 +14,5 @@ dependencies:
       - pandas
       - numpy==1.14.0
       - scipy==1.1.0
-      - stable-baselines
+      - stable-baselines==2.6.0
+      - boto3==1.9.199

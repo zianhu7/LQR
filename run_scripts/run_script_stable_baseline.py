@@ -1,8 +1,8 @@
-import argparse
-import datetime
+from datetime import datetime
 import json
 import os
 
+import boto3
 import gym
 from gym.envs.registration import register
 import tensorflow as tf
@@ -25,8 +25,14 @@ def create_env(env_name, env_config, register_env=True):
 
 
 if __name__ == '__main__':
+    # TODO(hyperparam sweeping)
     parser = GenLQRParserBaseline()
     args = parser.parse_args()
+
+    # create the saving directory
+    save_path = os.path.realpath(os.path.expanduser('~/baseline_results/{}'.format(args.exp_title)))
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     env_params = {"horizon": args.horizon, "exp_length": args.exp_length,
                   "reward_threshold":-abs(args.reward_threshold),
@@ -41,29 +47,34 @@ if __name__ == '__main__':
     else:
         env = SubprocVecEnv([create_env(env_name + '-v{}'.format(i), env_params) for i in range(args.num_cpus)])
 
-    # TODO(control learning rate, model size)
-    # TODO(add s3 uploading)
     policy_kwargs = dict(act_fun=tf.nn.tanh, net_arch=[256, 256])
-    model = PPO2('MlpPolicy', env, verbose=1, policy_kwargs=policy_kwargs, n_steps=args.rollout_size)
+    model = PPO2('MlpPolicy', env, verbose=1, policy_kwargs=policy_kwargs,
+                 n_steps=args.rollout_size, tensorboard_log=save_path, learning_rate=0.00025)
     model.learn(total_timesteps=args.num_steps)
 
     if not os.path.exists(os.path.realpath(os.path.expanduser('~/baseline_results'))):
         os.makedirs(os.path.realpath(os.path.expanduser('~/baseline_results')))
     path = os.path.realpath(os.path.expanduser('~/baseline_results'))
-    save_path = os.path.join(path, args.exp_title)
 
     print('Saving the trained model!')
-    model.save(save_path)
-    # dump the flow params
-    with open(os.path.join(path, args.exp_title) + '.json', 'w') as outfile:
+    model.save(os.path.join(save_path, args.exp_title))
+    with open(os.path.join(save_path, args.exp_title) + '.json', 'w') as outfile:
         json.dump(env_params, outfile, sort_keys=True, indent=4)
+    if args.use_s3:
+        s3_resource = boto3.resource('s3')
+        s3_folder = "final_cdc_lqr/" + datetime.now().strftime("%m-%d-%Y") + '/' + args.exp_title
+        for dirName, subdirList, fileList in os.walk(save_path):
+            for file in fileList:
+                s3_resource.Object("eugene.experiments", s3_folder).upload_file(os.path.join(dirName, file))
+
+
     del model
     del env_params
 
     # Replay the result by loading the model
     print('Loading the trained model and testing it out!')
-    model = PPO2.load(save_path)
-    with open(os.path.join(path, args.exp_title) + '.json', 'r') as outfile:
+    model = PPO2.load(save_path + args.exp_title)
+    with open(os.path.join(save_path, args.exp_title) + '.json', 'r') as outfile:
         env_params = json.load(outfile)
     env_constructor = create_env(env_name + '-v0', env_params, register_env=False)
     env = DummyVecEnv([lambda: env_constructor])  # The algorithms require a vectorized environment to run

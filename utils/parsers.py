@@ -63,4 +63,6 @@ def GenLQRParserBaseline():
     parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to use in the trial")
     parser.add_argument('--num_steps', type=int, default=5000, help='How many total steps to perform learning over')
     parser.add_argument('--rollout_size', type=int, default=1000, help='How many steps are in a training batch.')
+    parser.add_argument('--use_s3', action='store_true', help="If true, will upload to an s3 bucket. WARNING: "
+                                                              "the path is pretty hardcoded")
     return parser
