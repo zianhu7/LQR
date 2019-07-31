@@ -13,6 +13,8 @@ from utils.lqr_utils import check_controllability, check_observability, check_st
 class GenLQREnv(gym.Env):
     def __init__(self, env_params):  # Normalize Q, R
         '''
+        Parameters
+        =========
         self.es: (bool)
             If true randomly sample the elements of A and B with top eigenvalues of
             self.eigv_high and min of -eigv_low. If false, sample diagonalizable
@@ -32,6 +34,18 @@ class GenLQREnv(gym.Env):
         self.analytic_optimal_cost: (bool)
             If true, we compute the analytic optimal cost for our estimated \hat{K}. If false
             we just unroll the K for exp_length steps
+        self.full_ls: (bool)
+            If true, all the samples from the trials are used in the least squares
+        self.gaussian_actions: (bool)
+            If true, actions are sampled from a Gaussian with mean 0 and covariance cov_w * I where
+            I is the identity matrix
+        self.cov_w: (float)
+            This is the scaling factor on the covariance of the Gaussian noise. The gaussian is
+            N(0, cov_w * I).
+        self.rand_num_exp: (bool)
+            If true, the total number of trials is randomly sampled between Uniform(2 * dim, horizon / exp_length)
+        self.exp_length: (int)
+            How long each trial is. Defaults to 6.
         '''
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
@@ -45,12 +59,14 @@ class GenLQREnv(gym.Env):
         self.gaussian_actions = self.params["gaussian_actions"]
         #self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
         self.cov_w = self.params.get("cov_w", 1.0)
+        self.rand_num_exp = self.params["rand_num_exp"]
+        self.exp_length = self.params["exp_length"]
 
         # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
         # an actual Gaussian with covariance being the identity matrix.
         self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
-        self.action_offset = self.dim * (self.params["exp_length"] + 1) * int(
-            self.params["horizon"] / self.params["exp_length"])
+        self.action_offset = self.dim * (self.exp_length + 1) * int(
+            self.params["horizon"] / self.exp_length)
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
                                             shape=(self.action_offset + (self.params["horizon"] + 1) * self.dim + 2,))
@@ -159,11 +175,10 @@ class GenLQREnv(gym.Env):
         '''Reset the A and B matrices, reset the state matrix'''
         self.timestep = 0
         self.curr_exp = 0
-        if self.params["rand_num_exp"]:
+        if self.rand_num_exp:
             self.num_exp = int(np.random.uniform(low=2 * self.dim, high=self.num_exp_bound))
         else:
             self.num_exp = self.num_exp_bound
-        self.exp_length = int(self.params["exp_length"])
         self.horizon = self.num_exp * self.exp_length
         self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
         self.create_state()
