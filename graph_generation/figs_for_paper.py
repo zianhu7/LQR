@@ -172,7 +172,7 @@ if __name__ == '__main__':
     # ax = plt.gca()
     # ax.yaxis.set_major_formatter(formatter)
     plt.grid(True)
-    plot_name = "lqr_cost_v_eigenval.png"
+    plot_name = "figures/lqr_cost_v_eigenval.png"
     plt.savefig(plot_name)
     plt.show()
 
@@ -194,7 +194,7 @@ if __name__ == '__main__':
                 r'LS Controller Partial $\epsilon_A$', r'LS Controller Partial $\epsilon_B$',
                 r'LS Gaussian Full $\epsilon_A$', r'LS Gaussian Full $\epsilon_B$'])
     # plt.legend([r'$\epsilon_A$', r'$\epsilon_B$'])
-    plot_name = "eig_v_operator_norm.png"
+    plot_name = "figures/eig_v_operator_norm.png"
     plt.savefig(plot_name)
     plt.show()
 
@@ -220,6 +220,6 @@ if __name__ == '__main__':
     plt.title("Avg. Reward vs. training iterations")
     plt.xlabel('Training iteration')
     plt.ylabel('Avg. Reward')
-    plot_name = "training_curve.png"
+    plot_name = "figures/training_curve.png"
     plt.savefig(plot_name)
     plt.show()

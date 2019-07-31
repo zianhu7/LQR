@@ -1,9 +1,10 @@
 import argparse
 
-def GenLQRParser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
-                                                    "with this name")
+
+def env_args(parser):
+    # ================================================================================================
+    #                    ENV PARAMS
+    # ================================================================================================
     parser.add_argument("--horizon", type=int, default=120, help="Maximum number of total steps for an identification "
                                                                  "experiment.")
     parser.add_argument("--exp_length", type=int, default=6, help="The total length of an identification trial")
@@ -35,7 +36,31 @@ def GenLQRParser():
     parser.add_argument("--rand_num_exp", type=bool, default=1, help="If true, the max number of trials is sampled"
                                                                      "uniformly from 2 * dim to (horizon / exp_length "
                                                                      "Otherwise, the max num is horizon / exp length")
+
+
+def GenLQRParserRLlib():
+    parser = argparse.ArgumentParser()
+    env_args(parser)
+    # ================================================================================================
+    #                    RLLIB PARAMS
+    # ================================================================================================
+    parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
+                                                    "with this name")
     parser.add_argument("--num_cpus", type=int, default=2, help="Number of CPUs to use in the trial")
     parser.add_argument("--multi_node", type=bool, default=0, help="If true, run RLlib in cluster mode")
     parser.add_argument("--use_s3", type=bool, default=0, help="Upload results to s3")
+    return parser
+
+
+def GenLQRParserBaseline():
+    parser = argparse.ArgumentParser()
+    env_args(parser)
+    # ================================================================================================
+    #                    RLLIB PARAMS
+    # ================================================================================================
+    parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
+                                                    "with this name")
+    parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to use in the trial")
+    parser.add_argument('--num_steps', type=int, default=5000, help='How many total steps to perform learning over')
+    parser.add_argument('--rollout_size', type=int, default=1000, help='How many steps are in a training batch.')
     return parser

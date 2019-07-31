@@ -7,6 +7,8 @@ from gym import spaces
 from numpy.linalg import inv
 from scipy.linalg import solve_discrete_are as sda
 
+from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost
+
 
 class GenLQREnv(gym.Env):
     def __init__(self, env_params):  # Normalize Q, R
@@ -41,7 +43,8 @@ class GenLQREnv(gym.Env):
         self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
-        self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
+        #self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
+        self.cov_w = self.params.get("cov_w", 1.0)
 
         # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
         # an actual Gaussian with covariance being the identity matrix.
@@ -71,7 +74,7 @@ class GenLQREnv(gym.Env):
                 A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
                 Q_sqrt = scipy.linalg.sqrtm(self.Q)
                 # Ensure PD A, controllable system
-                while not self.check_controllability(A, B) and not self.check_observability(A, Q_sqrt):
+                while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
                     self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
                                                     size=self.dim)
                     self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
@@ -83,7 +86,7 @@ class GenLQREnv(gym.Env):
                 A = self.sample_matrix(self.eigv_high)
                 B = self.sample_matrix(self.eigv_high)
                 Q_sqrt = scipy.linalg.sqrtm(self.Q)
-                while not self.check_controllability(A, B) and not self.check_observability(A, Q_sqrt):
+                while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
                     A = self.sample_matrix(self.eigv_high)
                     B = self.sample_matrix(self.eigv_high)
                 self.A, self.B = A, B
@@ -103,11 +106,11 @@ class GenLQREnv(gym.Env):
         '''
         self.timestep += 1
         mean = [0] * self.dim
-        cov = np.eye(self.dim)
+        cov = self.cov_w * np.eye(self.dim)
         noise = np.random.multivariate_normal(mean, cov)
         if self.gaussian_actions:
             a = np.random.multivariate_normal(mean, cov)
-        if not self.gaussian_actions:
+        else:
             a = action
         curr_state = self.states[self.curr_exp][-1]
         new_state = self.A @ curr_state + self.B @ a + noise
@@ -124,7 +127,7 @@ class GenLQREnv(gym.Env):
             reward = self.calculate_reward()
         else:
             reward = 0
-        return self.state / self.obs_norm, reward, completion, {}
+        return self.state, reward, completion, {}
 
     def reset_exp(self):
         '''Restarts the rollout process for a given experiment'''
@@ -175,6 +178,8 @@ class GenLQREnv(gym.Env):
         return self.state
 
     ###############################################################################################
+    #                                   UTILITY FUNCTIONS
+    ###############################################################################################
 
     # Generate random orthornormal matrix of given dim
     def rvs(self, dim):
@@ -196,11 +201,9 @@ class GenLQREnv(gym.Env):
         return H
 
     def ls_estimate(self):
-        '''Compute an LS estimate of the A and B matrices'''
+        """Compute an LS estimate of the A and B matrices"""
 
         # NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
-        # if num_exp == 3 and exp_length == 3:
-        # import ipdb;ipdb.set_trace()
         if self.full_ls:
             X, Z = np.zeros((self.horizon, self.dim)), np.zeros((self.horizon, 2 * self.dim))
             for i in range(self.num_exp):
@@ -229,27 +232,11 @@ class GenLQREnv(gym.Env):
         return A, B
 
     def sda_estimate(self, A, B):
-        '''Solve the discrete algebraic ricatti equation to compute the optimal feedback'''
+        """Solve the discrete algebraic ricatti equation to compute the optimal feedback. """
         Q, R = self.Q, self.R
         X = sda(A, B, Q, R)
         K = np.linalg.inv(R + B.T @ X @ B) @ B.T @ X @ A
-        return X, -K
-
-    def estimate_K(self, horizon, A, B):
-        '''Solve for K recursively. Not used.'''
-        Q, R = self.Q, self.R
-        # Calculate P matrices first for each step
-        P_matrices = np.zeros((horizon + 1, Q.shape[0], Q.shape[1]))
-        P_matrices[horizon] = Q
-        for i in range(horizon - 1, 0, -1):
-            P_t = P_matrices[i + 1]
-            P_matrices[i] = Q + (A.T @ P_t @ A) - (A.T @ P_t @ B @ np.matmul(inv(R + B.T @ P_t @ B), B.T @ P_t @ A))
-        # Hardcoded shape of K, change to inferred shape for diverse testing
-        K_matrices = np.zeros((horizon, self.dim, self.dim))
-        for i in range(horizon):
-            P_i = P_matrices[i + 1]
-            K_matrices[i] = -np.matmul(inv(R + B.T @ P_i @ B), B.T @ P_i @ A)
-        return K_matrices
+        return -K
 
     def calculate_reward(self):
         '''Return the difference between J and J*'''
@@ -257,27 +244,22 @@ class GenLQREnv(gym.Env):
         Q, R, A, B = self.Q, self.R, self.A, self.B
         A_est, B_est = self.ls_estimate()
         try:
-            P_ss_hat, K_hat = self.sda_estimate(A_est, B_est)
+            K_hat = self.sda_estimate(A_est, B_est)
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
             return self.reward_threshold
-        P_ss_true, K_true = self.sda_estimate(self.A, self.B)
+        K_true = self.sda_estimate(self.A, self.B)
         r_true, r_hat = 0, 0
-        # Evolve trajectory based on computing input using both K
-        # synth_traj, true_traj = [[],[]], [[],[]]
-        # for i in range(self.num_exp):
-        # state_true, state_hat = self.states[i][0], self.states[i][0]
-        # true_traj[0].append(state_true); synth_traj[0].append(state_hat)
         x0 = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
         state_true = x0
         state_hat = np.copy(x0)
         if self.analytic_optimal_cost:
-            is_stable = not self.check_stability(K_hat)
+            is_stable = not check_stability(self.A, self.B, K_hat)
             if is_stable:
                 cov = np.eye(self.dim)
-                r_hat = np.trace(cov @ P_ss_hat)
-                r_true = np.trace(cov @ P_ss_true)
+                r_hat = LQR_cost(A, B, K_hat, Q, R, self.cov_w)
+                r_true = LQR_cost(A, B, K_true, Q, R, self.cov_w)
             # if we aren't stable under the true dynamics we go off to roughly infinity
             else:
                 r_hat = 1e6
@@ -304,46 +286,12 @@ class GenLQREnv(gym.Env):
         else:
             self.reward = reward
         self.inv_reward = -reward
-        self.stable_res = not self.check_stability(K_hat)
+        self.stable_res = not check_stability(self.A, self.B, K_hat)
         _, e_A, _ = np.linalg.svd(A - A_est)
         _, e_B, _ = np.linalg.svd(B - B_est)
         self.epsilon_A = max([abs(e) for e in e_A])
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward
-
-    def check_observability(self, A, C):
-        """Check that the observability matrix is full rank.
-           We check this by using the standard condition that
-           [C
-            CA
-            CA^2
-            .
-            .
-            .
-            CA^{n-1}] is full rank
-        """
-        dim = self.dim
-        stack = []
-        for i in range(dim):
-            term = C @ np.linalg.matrix_power(A, i)
-            stack.append(term)
-        obs_grammian = np.vstack(stack)
-        return np.linalg.matrix_rank(obs_grammian) == dim
-
-    def check_controllability(self, A, B):
-        """Check that the controllability matrix [B, BA, ..., BA^{n-1}] is full rank"""
-        dim = self.dim
-        stack = []
-        for i in range(dim):
-            term = B @ np.linalg.matrix_power(A, i)
-            stack.append(term)
-        grammian = np.hstack(stack)
-        return np.linalg.matrix_rank(grammian) == dim
-
-    def check_stability(self, control):
-        '''Confirm that the feedback matrix stabilizes the system'''
-        mat = self.A + self.B @ control
-        return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
 
     def sample_matrix(self, bound):
         '''Return a random matrix'''
