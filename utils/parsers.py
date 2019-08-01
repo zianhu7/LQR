@@ -82,6 +82,12 @@ def RolloutParser():
     """Used to rollout an environment a specified number of times"""
     parser = argparse.ArgumentParser()
     env_args(parser)
-    parser.add_argument("--steps", default=10000, help="Number of steps to roll out.")
+    parser.add_argument("--steps", type=int, default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", help="Output filename.")
+    parser.add_argument("--append", type=bool, default=1, help="If absent, files are written instead of appended")
+    parser.add_argument("--eigv_gen", type=bool, default=False,
+                        help="Eigenvalue generalization tests for eigenvalues of A. Sample matrices randomly and "
+                             "see how we perform relative to the top eigenvalue")
+    parser.add_argument("--opnorm_error", type=bool, default=False,
+                        help="Operator norm error of (A-A_est)")
     return parser

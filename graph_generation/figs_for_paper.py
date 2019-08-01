@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 from matplotlib import rc
 import numpy as np
@@ -108,6 +109,9 @@ def plot_generalization_rewards(fname, eig_high, dim, marker, color):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--save', action='store_true', help="If true, the figures are saved")
+    args = parser.parse_args()
     # # first construct the stability plot
     plt.figure(figsize=(14, 10))
     # y_ticks = np.arange(10e-2,10e2,1)
@@ -116,16 +120,18 @@ if __name__ == '__main__':
     stability_plot('output_files/dim3_full_constrained_eval_eval_matrix_benchmark.txt', 'o', 'b')
     stability_plot('output_files/dim3_partial_constrained_eval_eval_matrix_benchmark.txt', 'd', 'r')
     stability_plot('output_files/dim3_full_constrained_eval_gauss_eval_matrix_benchmark.txt', '<', 'y')
+    stability_plot('output_files/full_ls_fiechter_eval_matrix_benchmark.txt', 'x', 'g')
     plot_stable_txt('output_files/fir_true_stable.txt', '+', 'c')
     plot_stable_txt('output_files/fir_bootstrap_stable.txt', 'x', 'b')
-    plt.legend(['LS Controller Full', 'LS Controller Partial', 'Gaussian Full',
+    plt.legend(['LS Controller Full', 'LS Controller Partial', 'Gaussian Full', 'Fiechter'
                 'FIR True', 'FIR Bootstrap'])
     plt.title("LQR Stabilization Percentage")
     plt.xlabel("Rollout length", labelpad=10)
     plt.ylabel("Avg. Percent Stable")
     plt.grid(True)
     plot_name = 'output_files/stability_compare.png'
-    plt.savefig(plot_name)
+    if args.save:
+        plt.savefig(plot_name)
     plt.show()
 
     ##############################################################################################
@@ -149,7 +155,8 @@ if __name__ == '__main__':
     plt.legend(['LS Controller Full', 'LS Controller Partial', 'Gaussian Full',
                 'FIR True'])
     plot_name = 'output_files/rel_cost_compare.png'
-    plt.savefig(plot_name)
+    if args.save:
+        plt.savefig(plot_name)
     plt.show()
 
     ###############################################################################################
@@ -173,7 +180,8 @@ if __name__ == '__main__':
     # ax.yaxis.set_major_formatter(formatter)
     plt.grid(True)
     plot_name = "figures/lqr_cost_v_eigenval.png"
-    plt.savefig(plot_name)
+    if args.save:
+        plt.savefig(plot_name)
     plt.show()
 
     ###############################################################################################
@@ -195,7 +203,8 @@ if __name__ == '__main__':
                 r'LS Gaussian Full $\epsilon_A$', r'LS Gaussian Full $\epsilon_B$'])
     # plt.legend([r'$\epsilon_A$', r'$\epsilon_B$'])
     plot_name = "figures/eig_v_operator_norm.png"
-    plt.savefig(plot_name)
+    if args.save:
+        plt.savefig(plot_name)
     plt.show()
 
     # plt.figure(figsize=(14, 10))
@@ -221,5 +230,6 @@ if __name__ == '__main__':
     plt.xlabel('Training iteration')
     plt.ylabel('Avg. Reward')
     plot_name = "figures/training_curve.png"
-    plt.savefig(plot_name)
+    if args.save:
+        plt.savefig(plot_name)
     plt.show()

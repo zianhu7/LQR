@@ -61,6 +61,7 @@ def create_parser(parser_creator=None):
         description="Roll out a reinforcement learning agent "
                     "given a checkpoint.")
 
+    # TODO(@evinitsky) move this over to
     parser.add_argument(
         "--checkpoint", type=str, help="Checkpoint directory from which to roll out.")
     required_named = parser.add_argument_group("required named arguments")
@@ -117,6 +118,7 @@ def create_env_params(args):
 
 
 def run(args, parser, env_params):
+
     config = args.config
     if not config:
         # Load configuration from file
@@ -140,7 +142,6 @@ def run(args, parser, env_params):
         args.env = config.get("env")
 
     cls = get_agent_class(args.run)
-    import ipdb; ipdb.set_trace()
     agent = cls(env=args.env, config=config)
     agent.restore(args.checkpoint)
     num_steps = int(args.steps)
@@ -191,28 +192,36 @@ def run(args, parser, env_params):
                 with open('output_files/{}_eigv_generalization.txt'.format(args.out), 'a') as f:
                     f.write(write_val)
             else:
-                if not args.gaussian_actions:
-                    with open('output_files/eigv_generalization.txt', 'a') as f:
-                        f.write(write_val)
-                else:
+                if args.gaussian_actions:
                     with open('output_files/eigv_generalization_gaussian.txt', 'a') as f:
                         f.write(write_val)
+                else:
+                    with open('output_files/eigv_generalization.txt', 'a') as f:
+                        f.write(write_val)
         if args.opnorm_error:
+            info_string = ''
+            # note that args.eigv_gen and args.eval_matrix cannot be simultaneously true
             if args.eigv_gen:
                 write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' \
                             + str(env_obj.epsilon_B) + '\n'
-            if args.eval_matrix:
+                info_string = "eig_gen"
+            elif args.eval_matrix:
                 write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' \
                             + str(env_obj.epsilon_B) + '\n'
+                info_string = "eval_mat"
+            else:
+                print("One of args.eigv_gen or args.eval_matrix must be true")
+                exit()
+
             if args.out is not None:
-                with open('output_files/{}_opnorm_error.txt'.format(args.out), 'a') as f:
+                with open('output_files/{}_opnorm_error_{}.txt'.format(args.out, info_string), 'a') as f:
                     f.write(write_val)
             else:
-                if not args.gaussian_actions:
-                    with open('output_files/opnorm_error.txt', 'a') as f:
+                if args.gaussian_actions:
+                    with open('output_files/opnorm_error_gaussian_{}.txt'.format(info_string), 'a') as f:
                         f.write(write_val)
                 else:
-                    with open('output_files/opnorm_error_gaussian.txt', 'a') as f:
+                    with open('output_files/opnorm_error_{}.txt'.format(info_string), 'a') as f:
                         f.write(write_val)
         if args.out is not None:
             rollouts.append(rollout)
@@ -253,6 +262,13 @@ if __name__ == "__main__":
     ray.init()
     parser = create_parser()
     args = parser.parse_args()
+    if args.eigv_gen and args.eval_matrix:
+        print("You can't test eigenvalue generalization and simultaneously have a fixed evaluation matrix")
+        exit()
+    if not args.eigv_gen and not args.eval_matrix:
+        print("You have to test at least one of args.eval_matrix or args.eigv_gen")
+        exit()
+
     if args.clear_graphs:
         for file in os.listdir('output_files/'):
             os.remove(os.path.join('output_files/', file))

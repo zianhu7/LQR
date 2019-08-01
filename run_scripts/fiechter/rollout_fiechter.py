@@ -42,6 +42,13 @@ class FiechterExplorer(object):
 if __name__ == '__main__':
     parser = RolloutParser()
     args = parser.parse_args()
+    if args.eigv_gen and args.eval_matrix:
+        print("You can't test eigenvalue generalization and simultaneously have a fixed evaluation matrix")
+        exit()
+    if not args.eigv_gen and not args.eval_matrix:
+        print("You have to test at least one of args.eval_matrix or args.eigv_gen")
+        exit()
+
     exp_length = args.exp_length
     env_params = {"horizon": args.horizon, "exp_length": args.exp_length,
                   "reward_threshold":-np.abs(args.reward_threshold),
@@ -51,11 +58,27 @@ if __name__ == '__main__':
                   "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
     FiechterExplorer = FiechterExplorer(env_params)
     env = GenLQREnv(env_params)
+
+    # Set up the writing
     filepath = os.path.join(os.path.dirname(__file__), '../../graph_generation/output_files')
+    if args.append:
+        write_mode = 'a'
+    else:
+        write_mode = 'w'
+
+    # initialize the rollout variables
     steps = 0
     total_stable = 0
     num_episodes = 0
+    first_write = True  # used to control whether the files are overwritten
     while steps < args.steps:
+
+        # If we haven't indicated that we should append, the first write will overwrite the contents of the files
+        if first_write and not args.append:
+            write_mode = 'w'
+        else:
+            write_mode = 'a'
+
         obs = env.reset()
         env_steps = 0
         done = False
@@ -77,14 +100,58 @@ if __name__ == '__main__':
             env_steps += 1
 
         if args.out:
-            with open(os.path.join(filepath, '{}.txt'.format(args.out)), 'w') as f:
-                write_val = str(env.eigv_bound) + ' ' \
-                            + str(env.rel_reward) + ' ' + str(env.stable_res)
-                print(write_val)
+            with open(os.path.join(filepath, '{}.txt'.format(args.out)), write_mode) as f:
+                write_val = str(env.max_EA) + ' ' \
+                            + str(env.rel_reward) + ' ' + str(env.stable_res) + '\n'
                 f.write(write_val)
-                f.write('\n')
+
+        if args.eval_matrix:
+            write_val = str(env.num_exp) + ' ' \
+                        + str(env.rel_reward) + ' ' + str(env.stable_res) + '\n'
+            if args.out is not None:
+                with open(os.path.join(filepath, "{}_fiechter_eval_matrix_benchmark.txt".format(args.out)),
+                          write_mode) as f:
+                    f.write(write_val)
+            else:
+                if not args.gaussian_actions:
+                    with open(os.path.join(filepath, "fiechter_eval_matrix_benchmark.txt"), write_mode) as f:
+                        f.write(write_val)
+
+        if args.eigv_gen:
+            write_val = str(env.max_EA) + ' ' + str(env.rel_reward) + ' ' \
+                        + str(env.stable_res) + '\n'
+            if args.out is not None:
+                with open(os.path.join(filepath, "{}_fiechter_eigv_generalization.txt".format(args.out)),
+                          write_mode) as f:
+                    f.write(write_val)
+            else:
+                if not args.gaussian_actions:
+                    with open(os.path.join(filepath, "fiechter_eigv_generalization.txt"), write_mode) as f:
+                        f.write(write_val)
+
+        if args.opnorm_error:
+            info_string = ''
+            if args.eigv_gen:
+                write_val = str(env.max_EA) + ' ' + str(env.epsilon_A) + ' ' \
+                            + str(env.epsilon_B) + '\n'
+                info_string = "eig_gen"
+            if args.eval_matrix:
+                write_val = str(env.num_exp) + ' ' + str(env.epsilon_A) + ' ' \
+                            + str(env.epsilon_B) + '\n'
+                info_string = "eval_mat"
+            if args.out is not None:
+                with open(os.path.join(filepath, "{}_fiechter_opnorm_error_{}.txt".format(args.out, info_string)),
+                          write_mode) as f:
+                    f.write(write_val)
+            else:
+                if not args.gaussian_actions:
+                    with open(os.path.join(filepath, "fiechter_opnorm_error_{}.txt".format(info_string)),
+                              write_mode) as f:
+                        f.write(write_val)
 
         total_stable += bool(env.stable_res)
         rel_reward += env.rel_reward
         num_episodes += 1
-    print('Mean rel reward is: {}, Fraction stable is {}'.format(rel_reward / num_episodes, total_stable / num_episodes))
+        if first_write:
+            first_write = False
+    print("Mean rel reward is: {}, Fraction stable is {}".format(rel_reward / num_episodes, total_stable / num_episodes))
