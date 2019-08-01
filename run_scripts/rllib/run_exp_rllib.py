@@ -45,7 +45,7 @@ if __name__ == '__main__':
     else:
         ray.init()
     config = ppo.DEFAULT_CONFIG.copy()
-    config["train_batch_size"] = 30000
+    config["train_batch_size"] = args.train_batch_size
     config["num_sgd_iter"]=10
     config["num_workers"] = args.num_cpus
     config["gamma"] = 0.95

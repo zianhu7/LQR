@@ -55,6 +55,7 @@ def GenLQRParserRLlib():
     parser.add_argument("--num_iters", type=int, default=1, help="Total number of gradient steps")
     parser.add_argument("--num_samples", type=int, default=1, help="How many times to repeat each experiment")
     parser.add_argument("--grid_search", type=bool, default=0, help="Do a tune grid search if true")
+    parser.add_argument("--train_batch_size", type=int, default=30000, help="How many steps in a gradient batch")
     return parser
 
 
