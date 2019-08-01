@@ -52,11 +52,14 @@ if __name__ == '__main__':
     config["horizon"] = args.horizon
     config["use_gae"] = True
     config["lambda"] = 0.1
-    config["lr"] = grid_search([5e-4, 8e-4, 5e-3, 5e-5, 1e-3, 1e-4, 8e-5, 1e-4, 9e-4, 2e-3])
+    if args.grid_search:
+        config["lr"] = grid_search([5e-4, 8e-4, 5e-3, 5e-5, 1e-3, 1e-4, 8e-5, 1e-4, 9e-4, 2e-3])
+    else:
+        config["lr"] = 5e-4
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 
-    s3_string = "s3://eugene.experiments/trb_bottleneck_paper/" \
+    s3_string = "s3://eugene.experiments/final_cdc_lqr/" \
                 + datetime.now().strftime("%m-%d-%Y") + '/' + args.exp_title
     config['env'] = env_name
     exp_dict = {

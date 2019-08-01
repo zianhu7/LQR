@@ -7,7 +7,6 @@ from ray.tune.registry import register_env
 import argparse
 import json
 import os
-import pickle
 
 import gym
 from gym.envs.registration import register

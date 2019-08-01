@@ -54,6 +54,7 @@ def GenLQRParserRLlib():
                                                                        "checkpoint.")
     parser.add_argument("--num_iters", type=int, default=1, help="Total number of gradient steps")
     parser.add_argument("--num_samples", type=int, default=1, help="How many times to repeat each experiment")
+    parser.add_argument("--grid_search", type=bool, default=0, help="Do a tune grid search if true")
     return parser
 
 
@@ -70,4 +71,18 @@ def GenLQRParserBaseline():
     parser.add_argument('--rollout_size', type=int, default=1000, help='How many steps are in a training batch.')
     parser.add_argument('--use_s3', action='store_true', help="If true, will upload to an s3 bucket. WARNING: "
                                                               "the path is pretty hardcoded")
+    parser.add_argument('--checkpoint_freq', type=int, default=1, help="How often to check if the model has improved "
+                                                                       "and consequently save it")
+    parser.add_argument('--callback', type=bool, default=1, help="Whether to save the model using a callback or just"
+                                                                 "at the end of the training")
+    return parser
+
+
+def RolloutParser():
+    """Used to rollout an environment a specified number of times"""
+    parser = argparse.ArgumentParser()
+    env_args(parser)
+    parser.add_argument(
+        "--steps", default=10000, help="Number of steps to roll out.")
+    parser.add_argument("--out", default=None, help="Output filename.")
     return parser
