@@ -53,7 +53,7 @@ if __name__ == '__main__':
     config["use_gae"] = True
     config["lambda"] = 0.1
     if args.grid_search:
-        config["lr"] = grid_search([5e-4, 8e-4, 5e-3, 5e-5, 1e-3, 1e-4, 8e-5, 1e-4, 9e-4, 2e-3])
+        config["lr"] = grid_search([1e-4, 1e-3, 1e-2])
     else:
         config["lr"] = 5e-4
     config["sgd_minibatch_size"] = 64
