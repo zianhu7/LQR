@@ -34,7 +34,7 @@ class FiechterExplorer(object):
         self.curr_direction = np.random.randint(low=0, high=self.dim)
 
     def compute_action(self):
-        arr = np.zeros(self.dim, 1)
+        arr = np.zeros(self.dim)
         arr[self.curr_direction] = self.magnitude
         return arr
 
@@ -42,12 +42,19 @@ class FiechterExplorer(object):
 if __name__ == '__main__':
     parser = RolloutParser()
     args = parser.parse_args()
-    FiechterExplorer = FiechterExplorer(args)
+    exp_length = args.exp_length
+    env_params = {"horizon": args.horizon, "exp_length": args.exp_length,
+                  "reward_threshold":-np.abs(args.reward_threshold),
+                  "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
+                  "elem_sample": args.elem_sample, "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
+                  "dim": args.dim, "eval_mode": args.eval_mode, "analytic_optimal_cost": args.analytic_optimal_cost,
+                  "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
+    FiechterExplorer = FiechterExplorer(env_params)
+    env = GenLQREnv(env_params)
+    filepath = os.path.join(os.path.dirname(__file__), '../../graph_generation/output_files')
     steps = 0
     total_stable = 0
-    exp_length = args.exp_length
-    env = GenLQREnv(args)
-    filepath = os.path.join(os.path.dirname(__file__), '../../graph_generation/output_files')
+    num_episodes = 0
     while steps < args.steps:
         obs = env.reset()
         env_steps = 0
@@ -67,14 +74,17 @@ if __name__ == '__main__':
             if trial_counter == 0:
                 FiechterExplorer.update_direction()
             steps += 1
+            env_steps += 1
 
-        if args.out is not None:
+        if args.out:
             with open(os.path.join(filepath, '{}.txt'.format(args.out)), 'w') as f:
-                write_val = str(env.unwrapped.eigv_bound) + ' ' \
-                            + str(env.unwrapped.rel_reward) + ' ' + str(env.unwrapped.stable_res)
+                write_val = str(env.eigv_bound) + ' ' \
+                            + str(env.rel_reward) + ' ' + str(env.stable_res)
                 print(write_val)
                 f.write(write_val)
                 f.write('\n')
 
-        total_stable += bool(env.unwrapped.stable_res)
-        rel_reward += env.unwrapped.rel_reward
+        total_stable += bool(env.stable_res)
+        rel_reward += env.rel_reward
+        num_episodes += 1
+    print('Mean rel reward is: {}, Fraction stable is {}'.format(rel_reward / num_episodes, total_stable / num_episodes))

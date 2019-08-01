@@ -82,7 +82,6 @@ def RolloutParser():
     """Used to rollout an environment a specified number of times"""
     parser = argparse.ArgumentParser()
     env_args(parser)
-    parser.add_argument(
-        "--steps", default=10000, help="Number of steps to roll out.")
-    parser.add_argument("--out", default=None, help="Output filename.")
+    parser.add_argument("--steps", default=10000, help="Number of steps to roll out.")
+    parser.add_argument("--out", help="Output filename.")
     return parser
