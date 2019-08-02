@@ -75,4 +75,4 @@ if __name__ == '__main__':
     if args.use_s3:
         exp_dict['upload_dir'] = s3_string
 
-    run(**exp_dict, queue_trials=True)
+    run(**exp_dict, queue_trials=False)
