@@ -23,7 +23,7 @@ class FiechterExplorer(object):
         """
         self.params = params
         self.dim = params["dim"]
-        self.magnitude = np.sqrt(2 / np.pi)
+        self.magnitude = np.sqrt(self.dim * 2 / np.pi)
         self.curr_direction = 0
 
     def update_direction(self):
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         rel_reward = 0
         trial_counter = 0
         FiechterExplorer.reset()
-        while env_steps < args.horizon and not done:
+        while not done:
             action = FiechterExplorer.compute_action()
             obs, reward, done, _ = env.step(action)
             reward_total += reward

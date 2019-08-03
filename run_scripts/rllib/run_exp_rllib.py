@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 import gym
 from gym.envs.registration import register
@@ -53,11 +54,15 @@ if __name__ == '__main__':
     config["use_gae"] = True
     config["lambda"] = 0.1
     if args.grid_search:
-        config["lr"] = grid_search([1e-4, 1e-3, 1e-2])
+        config["lr"] = grid_search([1e-4, 1e-3])
     else:
         config["lr"] = 5e-4
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
+
+    # save the env params for later replay
+    flow_json = json.dumps(env_params, sort_keys=True, indent=4)
+    config['env_config']['env_params'] = flow_json
 
     s3_string = "s3://eugene.experiments/final_cdc_lqr/" \
                 + datetime.now().strftime("%m-%d-%Y") + '/' + args.exp_title

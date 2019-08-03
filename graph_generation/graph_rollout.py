@@ -3,18 +3,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from ray.tune.registry import register_env
 import argparse
 import json
 import os
 import pickle
 
 import gym
-from gym.envs.registration import register
+import numpy as np
 import ray
 from ray.rllib.agents.registry import get_agent_class
-from ray.rllib.models import ModelCatalog
-import plot_suboptimality as ps
+
+from envs import GenLQREnv
+import graph_generation.plot_suboptimality as ps
+from utils.rllib_utils import merge_dicts
 
 # Example Usage via RLlib CLI:
 """
@@ -31,27 +32,6 @@ REQUIRED:
     1. '--full_ls' Based on whether trained policy has learned full or partial ls sampling
     2. If '--eigv_gen' is True, must specify '--rand_num_exp' to fix rollout length for replay
 """
-
-
-env_name = "GenLQREnv"
-env_version_num = 100
-env_name = env_name + '-v' + str(env_version_num)
-
-
-def pass_params_to_gym(_):
-    global env_params
-    # WARNING: env_params is being passed as a global variable
-    register(
-        id=env_name,
-        entry_point=("envs.GenLQREnv:GenLQREnv"), kwargs={"env_params": env_params},
-    )
-
-
-def create_env(env_config):
-    global env_name
-    pass_params_to_gym(env_name)
-    env = gym.envs.make(env_name)
-    return env
 
 
 def create_parser(parser_creator=None):
@@ -73,23 +53,23 @@ def create_parser(parser_creator=None):
              "of a built-on algorithm (e.g. RLLib's DQN or PPO), or a "
              "user-defined trainable function or class registered in the "
              "tune registry.")
-    required_named.add_argument("--env", type=str, help="The gym environment to use.")
+    required_named.add_argument("--env", type=str, default="GenLQREnv", help="The gym environment to use.")
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
     parser.add_argument("--high", type=float, nargs='+', default=1,
                         help="upper bound for eigenvalue initialization")
-    parser.add_argument("--eval_matrix", type=bool, default=False,
+    parser.add_argument("--eval_matrix", type=int, default=0,
                         help="Whether to benchmark on `Sample complexity of quadratic "
                              "regulator` system for R3")
-    parser.add_argument("--eigv_gen", type=bool, default=False,
+    parser.add_argument("--eigv_gen", type=int, default=0,
                         help="Eigenvalue generalization tests for eigenvalues of A. Sample matrices randomly and "
                              "see how we perform relative to the top eigenvalue")
-    parser.add_argument("--opnorm_error", type=bool, default=False,
+    parser.add_argument("--opnorm_error", type=int, default=0,
                         help="Operator norm error of (A-A_est)")
-    parser.add_argument("--full_ls", type=bool, default=True,
+    parser.add_argument("--full_ls", type=int, default=1,
                         help="Sampling type")
-    parser.add_argument("--es", type=bool, default=True, help="Element sampling")
+    parser.add_argument("--es", type=int, default=1, help="Element sampling")
     parser.add_argument("--rand_num_exp", action='store_true', help="If passed, the total number of experiments is "
                                                                     "sampled uniformly from 2 * dim to "
                                                                     "(horizon / exp_length). Otherwise the number of "
@@ -121,16 +101,18 @@ def run(args, parser, env_params):
 
     config = args.config
     if not config:
-        # Load configuration from file
         config_dir = os.path.dirname(args.checkpoint)
-        config_path = os.path.join(config_dir, "params.json")
+        config_path = os.path.join(config_dir, "params.pkl")
         if not os.path.exists(config_path):
-            config_path = os.path.join(config_dir, "../params.json")
-        if not os.path.exists(config_path): raise ValueError(
-            "Could not find params.json in either the checkpoint dir or "
-            "its parent directory.")
-        with open(config_path) as f:
-            config = json.load(f)
+            config_path = os.path.join(config_dir, "../params.pkl")
+        if not os.path.exists(config_path):
+            if not args.config:
+                raise ValueError(
+                    "Could not find params.pkl in either the checkpoint dir or "
+                    "its parent directory.")
+        else:
+            with open(config_path, "rb") as f:
+                config = pickle.load(f)
         if "num_workers" in config:
             config["num_workers"] = min(2, config["num_workers"])
 
@@ -142,28 +124,34 @@ def run(args, parser, env_params):
         args.env = config.get("env")
 
     cls = get_agent_class(args.run)
-    agent = cls(env=args.env, config=config)
-    agent.restore(args.checkpoint)
+
+    # pull in the params from training time and overwrite. If statement for backwards compatibility
+    if len(config["env_config"]) > 0:
+        base_params = config["env_config"]["env_params"]
+        env_params = merge_dicts(base_params, env_params)
+
+    config["env_config"] = env_params
+    agent = cls(env=GenLQREnv, config=config)
+    agent.restore(os.path.join(args.checkpoint, os.path.basename(args.checkpoint).replace('_', '-')))
     num_steps = int(args.steps)
 
     if hasattr(agent, "local_evaluator"):
         env = agent.local_evaluator.env
     else:
-        env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
+        env = GenLQREnv(env_params)
     if args.out is not None:
         rollouts = []
     steps = 0
-    total_stable = 0
-    episode_reward = 0
+    action_norm_list = []
     while steps < (num_steps or steps + 1):
         if args.out is not None:
             rollout = []
         state = env.reset()
         done = False
         reward_total = 0.0
-        rel_reward = 0
         while not done and steps < (num_steps or steps + 1):
             action = agent.compute_action(state)
+            action_norm_list.append(np.linalg.norm(action))
             next_state, reward, done, _ = env.step(action)
             reward_total += reward
             if args.out is not None:
@@ -171,7 +159,6 @@ def run(args, parser, env_params):
             steps += 1
             state = next_state
         env_obj = env.unwrapped
-        import ipdb; ipdb.set_trace()
         if args.eval_matrix:
             write_val = str(env_obj.num_exp) + ' ' \
                         + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
@@ -226,6 +213,14 @@ def run(args, parser, env_params):
         if args.out is not None:
             rollouts.append(rollout)
 
+    # save the norm of the action
+    if args.out is not None:
+        with open('output_files/{}_action_norm.txt'.format(args.out), 'a') as f:
+            f.write(write_val)
+    else:
+        with open('output_files/action_norm.txt'.format(args.out), 'a') as f:
+            f.write(write_val)
+
     graph(args, env_params)
 
 
@@ -256,9 +251,6 @@ def graph(args, env_params):
 
 if __name__ == "__main__":
     global env_params
-    env_name = "GenLQREnv"
-    env_version_num = 0
-    env_name = env_name + '-v' + str(env_version_num)
     ray.init()
     parser = create_parser()
     args = parser.parse_args()
@@ -273,6 +265,7 @@ if __name__ == "__main__":
         for file in os.listdir('output_files/'):
             os.remove(os.path.join('output_files/', file))
     env_params = create_env_params(args)
+    # TODO(@evinitsky) convert this into a shell script dude
     if args.create_all_graphs:
         # FIGURE SET 1
         # Dimension 3, constrained actions
@@ -407,9 +400,9 @@ if __name__ == "__main__":
                       "full_ls": full_ls, "rand_num_exp": args.rand_num_exp,
                       "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True,
                       "eval_mode": True}
-        register_env(env_name, lambda env_config: create_env(env_config))
         args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                        '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        args.checkpoint = '/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-02-2019/dim3_full_ls/dim3_full_ls/PPO_GenLQREnv-v0_1_lr=0.001_2019-08-02_01-06-570jak_wrm/checkpoint_2500'
         args.high = env_params['eigv_high']
 
         run(args, parser, env_params)

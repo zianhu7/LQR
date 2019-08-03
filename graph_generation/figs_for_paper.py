@@ -123,7 +123,7 @@ if __name__ == '__main__':
     stability_plot('output_files/full_ls_fiechter_eval_matrix_benchmark.txt', 'x', 'g')
     plot_stable_txt('output_files/fir_true_stable.txt', '+', 'c')
     plot_stable_txt('output_files/fir_bootstrap_stable.txt', 'x', 'b')
-    plt.legend(['LS Controller Full', 'LS Controller Partial', 'Gaussian Full', 'Fiechter'
+    plt.legend(['LS Controller Full', 'LS Controller Partial', 'Gaussian Full', 'Fiechter',
                 'FIR True', 'FIR Bootstrap'])
     plt.title("LQR Stabilization Percentage")
     plt.xlabel("Rollout length", labelpad=10)

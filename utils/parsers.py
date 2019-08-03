@@ -1,4 +1,5 @@
 import argparse
+import json
 
 
 def env_args(parser):
@@ -91,4 +92,26 @@ def RolloutParser():
                              "see how we perform relative to the top eigenvalue")
     parser.add_argument("--opnorm_error", type=int, default=False,
                         help="Operator norm error of (A-A_est)")
+    return parser
+
+
+def ReplayParser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoint", help="path to the desired pre-trained model")
+    parser.add_argument(
+        "--config",
+        default="{}",
+        type=json.loads,
+        help="Algorithm-specific configuration (e.g. env, hyperparams). "
+             "Supresses loading of configuration from checkpoint.")
+    parser.add_argument(
+        "--run",
+        type=str,
+        default='PPO',
+        help="The algorithm or model to train. This may refer to the name "
+             "of a built-on algorithm (e.g. RLLib's DQN or PPO), or a "
+             "user-defined trainable function or class registered in the "
+             "tune registry.")
+    env_args(parser)
+
     return parser
