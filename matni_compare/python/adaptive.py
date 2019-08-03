@@ -7,7 +7,7 @@ different adaptive strategies.
 
 
 import numpy as np
-import utils
+from matni_compare.python import utils
 import logging
 import time
 import itertools as it

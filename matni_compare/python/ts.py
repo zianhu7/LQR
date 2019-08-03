@@ -3,11 +3,11 @@
 """
 
 import numpy as np
-import utils
+from matni_compare.python import utils
 import logging
 import math
 
-from adaptive import AdaptiveMethod
+from matni_compare.python.adaptive import AdaptiveMethod
 
 
 class TSStrategy(AdaptiveMethod):

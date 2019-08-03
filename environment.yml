@@ -2,6 +2,7 @@ name: lqr
 
 dependencies:
     - python==3.6.3
+    - nb_conda==2.2.1
     - pip:
       - ray==0.7.2
       - tensorflow==1.13.1

@@ -9,13 +9,13 @@ Lyapunov relaxation.
 
 import numpy as np
 import cvxpy as cvx
-import utils
+from matni_compare.python import utils
 import logging
 import math
 import scipy.linalg
 
 from abc import ABC, abstractmethod
-from adaptive import AdaptiveMethod
+from matni_compare.python.adaptive import AdaptiveMethod
 
 
 class SLSInfeasibleException(Exception):

@@ -11,9 +11,9 @@ import logging
 import time
 import cvxpy as cvx
 
-import utils
+from matni_compare.python import utils
 
-from adaptive import AdaptiveMethod
+from matni_compare.python.adaptive import AdaptiveMethod
 
 
 def function_value(Q, R, A, B):

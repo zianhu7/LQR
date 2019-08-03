@@ -1,8 +1,7 @@
 import numpy as np
-import utils
+from matni_compare.python import utils
 
-
-from sls import sls_synth, make_state_space_controller, sls_common_lyapunov, h2_squared_norm
+from matni_compare.python.sls import sls_synth, make_state_space_controller, sls_common_lyapunov, h2_squared_norm
 
 
 def test_sls_synth():

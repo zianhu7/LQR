@@ -1,16 +1,27 @@
+"""Here we use the adaptive input designer to schedule the rollouts. Since we currently have a max horizon length
+   of 120, we stop after that many iterations.
+"""
+
 """nominal.py
 
 """
-
-import numpy as np
-import matni_compare.python.utils as utils
 import logging
 import math
+import os
+import pickle
 
+import numpy as np
+import ray
+from ray.rllib.agents.registry import get_agent_class
+
+from envs import GenLQREnv
 from matni_compare.python.adaptive import AdaptiveMethod
+import matni_compare.python.utils as utils
+from matni_compare.python.constants import horizon
+from utils.rllib_utils import merge_dicts
 
 
-class NominalStrategy(AdaptiveMethod):
+class AdaptiveInputStrategy(AdaptiveMethod):
     """Adaptive control based on nominal estimates of the dynamics
 
     """
@@ -25,7 +36,22 @@ class NominalStrategy(AdaptiveMethod):
                  sigma_explore,
                  reg,
                  epoch_multiplier,
-                 epoch_schedule='linear'):
+                 checkpoint_path,
+                 epoch_schedule='linear',):
+        """
+
+        :param Q:
+        :param R:
+        :param A_star:
+        :param B_star:
+        :param sigma_w:
+        :param rls_lam:
+        :param sigma_explore:
+        :param reg:
+        :param epoch_multiplier:
+        :param checkpoint_path: Path to rllib checkpoint
+        :param epoch_schedule:
+        """
         super().__init__(Q, R, A_star, B_star, sigma_w, rls_lam)
         self._sigma_explore = sigma_explore
         self._reg = reg
@@ -34,6 +60,48 @@ class NominalStrategy(AdaptiveMethod):
             raise ValueError("invalid epoch_schedule: {}".format(epoch_schedule))
         self._epoch_schedule = epoch_schedule
         self._logger = logging.getLogger(__name__)
+
+        # instantiate the agent
+        ray.init()
+        # Get the arguments
+
+        env_params = {"horizon": horizon, "exp_length": 6,
+                      "reward_threshold": -10,
+                      "eigv_low": 0, "eigv_high": 20,
+                      "elem_sample": 0, "eval_matrix": 1, "full_ls": 1,
+                      "dim": 3, "eval_mode": 1, "analytic_optimal_cost": 1,
+                      "gaussian_actions": 0, "rand_num_exp": 0}
+
+        # Instantiate the env
+        config_dir = os.path.dirname(checkpoint_path)
+        config_path = os.path.join(config_dir, "params.pkl")
+        if not os.path.exists(config_path):
+            config_path = os.path.join(config_dir, "../params.pkl")
+        if not os.path.exists(config_path):
+            raise ValueError(
+                "Could not find params.pkl in either the checkpoint dir or "
+                "its parent directory.")
+        else:
+            with open(config_path, "rb") as f:
+                config = pickle.load(f)
+        if "num_workers" in config:
+            config["num_workers"] = min(2, config["num_workers"])
+
+        # convert to max cpus available on system
+        config['num_workers'] = 1
+
+        # pull in the params from training time and overwrite. If statement for backwards compatibility
+        if len(config["env_config"]) > 0:
+            base_params = config["env_config"]["env_params"]
+            env_params = merge_dicts(base_params, env_params)
+
+        cls = get_agent_class('PPO')
+        config["env_config"] = env_params
+        self.agent = cls(env=GenLQREnv, config=config)
+        self.agent.restore(os.path.join(checkpoint_path, os.path.basename(checkpoint_path).replace('_', '-')))
+
+        self.env = GenLQREnv(env_params)
+        self.env.reset()
 
     def _get_logger(self):
         return self._logger
@@ -46,7 +114,8 @@ class NominalStrategy(AdaptiveMethod):
         self._explore_stddev_history.append(self._explore_stddev())
 
     def _design_controller(self, states, inputs, transitions, rng):
-
+        # TODO(@evinitsky) how often is this actually called?
+        import ipdb; ipdb.set_trace()
         logger = self._get_logger()
 
         # do a least squares fit and controller based on the nominal
@@ -86,12 +155,24 @@ class NominalStrategy(AdaptiveMethod):
         else:
             return False
 
+    # We use the nominal controller but with the exploratory action selected from our policy
     def _get_input(self, state, rng):
+        import ipdb; ipdb.set_trace()
         rng = self._get_rng(rng)
         ctrl_input = self._current_K.dot(state)
-        explore_input = self._explore_stddev() * rng.normal(size=(self._p,))
-        return ctrl_input + explore_input
+        explore_input = self.agent.compute_action(self.env.state)
 
+        # Explore in a weighted mixture between the agent and the nominal controller
+        explore_input *= self._explore_stddev() / np.linalg.norm(explore_input)
+        final_action = ctrl_input + explore_input
+
+        # Update the state of the agent
+        self.env.update_state(state)
+        self.env.update_action(final_action)
+        # Update the env so all of the tracking is done correctly
+        self.env.step(final_action)
+
+        return final_action
 
 def _main():
     import matni_compare.python.examples as examples
@@ -113,7 +194,7 @@ def _main():
                           sigma_w=1,
                           sigma_explore=0.1,
                           reg=1e-5,
-                          epoch_multiplier=10, 
+                          epoch_multiplier=10,
                           rls_lam=None)
 
     env.reset(rng)

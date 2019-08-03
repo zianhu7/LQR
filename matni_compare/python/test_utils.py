@@ -1,8 +1,8 @@
 import numpy as np
 import cvxpy as cvx
 
-import utils
-from utils import project_ball, project_weighted_ball, psd_sqrt
+from matni_compare.python import utils
+from matni_compare.python.utils import project_ball, project_weighted_ball, psd_sqrt
 
 
 def test_project_weighted_ball():

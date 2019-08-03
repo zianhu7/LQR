@@ -1,8 +1,8 @@
 import numpy as np
-import utils
+from matni_compare.python import utils
 
 from scipy.optimize import check_grad
-from ofu import function_value, gradient
+from matni_compare.python.ofu import function_value, gradient
 
 
 def test_gradient():
