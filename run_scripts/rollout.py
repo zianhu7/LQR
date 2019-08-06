@@ -150,7 +150,6 @@ if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10,
-                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling": [0, 1], "r_scaling": [1, 1],
-                  "elem_sample": True}
+                  "eigv_low": 0.5, "eigv_high": 2, "q_scaling": [0, 1], "r_scaling": [1, 1]}
     register_env(env_name, lambda env_config: create_env(env_config))
     run(args, parser, env_params)

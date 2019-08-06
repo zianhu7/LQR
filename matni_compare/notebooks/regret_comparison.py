@@ -1,17 +1,20 @@
 """Script version of regret comparison notebook because I hate Jupyter notebooks (for actually running code).
 Great for prototyping though. No hate."""
-import numpy as np
-import time
 import logging
 from multiprocessing import Pool, cpu_count
-
+import numpy as np
+import os
+import pickle
 import sys
-sys.path.append('../python')
+import time
 
 import matplotlib.pylab as plt
+import ray
+from ray.rllib.agents.registry import get_agent_class
 import seaborn as sns
 sns.set_style('ticks')
 
+from envs import GenLQREnv
 from matni_compare.python import utils
 from matni_compare.python import examples
 from matni_compare.python.adaptiveinput import AdaptiveInputStrategy
@@ -117,6 +120,39 @@ def sls_cl_ctor():
 
 
 checkpoint_path = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-02-2019/dim3_full_ls/dim3_full_ls/PPO_GenLQREnv-v0_1_lr=0.001_2019-08-02_01-06-570jak_wrm/checkpoint_2500"
+# Run the adaptive input methods
+# TODO parallelize. It's kind of hard though because of rllib.
+# set up the agent
+ray.init()
+# Instantiate the env
+config_dir = os.path.dirname(checkpoint_path)
+config_path = os.path.join(config_dir, "params.pkl")
+if not os.path.exists(config_path):
+    config_path = os.path.join(config_dir, "../params.pkl")
+if not os.path.exists(config_path):
+    raise ValueError(
+        "Could not find params.pkl in either the checkpoint dir or "
+        "its parent directory.")
+else:
+    with open(config_path, "rb") as f:
+        config = pickle.load(f)
+if "num_workers" in config:
+    config["num_workers"] = min(2, config["num_workers"])
+
+# convert to max cpus available on system
+config['num_workers'] = 1
+
+# Set up the env
+env_params = {"horizon": horizon, "exp_length": 6,
+              "reward_threshold": -10,
+              "eigv_low": 0, "eigv_high": 20,
+              "eval_matrix": 1, "full_ls": 1,
+              "dim": 3, "eval_mode": 1, "analytic_optimal_cost": 1,
+              "gaussian_actions": 0, "rand_num_exp": 0}
+cls = get_agent_class('PPO')
+config["env_config"] = env_params
+agent = cls(env=GenLQREnv, config=config)
+agent.restore(os.path.join(checkpoint_path, os.path.basename(checkpoint_path).replace('_', '-')))
 
 
 def adaptive_input_actor():
@@ -127,8 +163,11 @@ def adaptive_input_actor():
                           sigma_w=sigma_w,
                           sigma_explore=sigma_excitation,
                           reg=1e-5,
-                          epoch_multiplier=10, rls_lam=None,
-                          checkpoint_path=checkpoint_path)
+                          epoch_multiplier=10,
+                          rls_lam=None,
+                          agent=agent,
+                          env_params=env_params,
+                                 epoch_schedule='linear')
 
 # # Helper methods for running in parallel
 
@@ -179,15 +218,15 @@ def process_future_list(ftchs):
 
 
 # # Running experiments and plotting results
-
-# strategies = ['optimal', 'nominal', 'ofu', 'ts', 'sls_cl', 'sls_fir']
-# start_time = time.time()
-# with Pool(processes=cpu_count()) as p:
-#     all_futures = [[spawn_invocation(method, p, prime_fixed=True)
-#                     for _ in range(trials_per_method)] for method in strategies]
-#     list_of_results = [process_future_list(ftchs) for ftchs in all_futures]
-# print("finished execution in {} seconds".format(time.time() - start_time))
-
+# Run the comparison methods
+# TODO(add bad invocations)
+strategies = ['optimal', 'nominal', 'ofu', 'ts', 'sls_cl', 'sls_fir']
+start_time = time.time()
+with Pool(processes=cpu_count()) as p:
+    all_futures = [[spawn_invocation(method, p, prime_fixed=True)
+                    for _ in range(trials_per_method)] for method in strategies]
+    list_of_results = [process_future_list(ftchs) for ftchs in all_futures]
+print("finished execution in {} seconds".format(time.time() - start_time))
 
 start_time = time.time()
 # Run the adaptive input designer
@@ -202,9 +241,9 @@ print("finished execution in {} seconds".format(time.time() - start_time))
 
 
 def get_errorbars(regrets, q=10, percent_bad=0.0):
-    median = np.percentile(regrets, q=50-percent_bad, axis=0)
+    median = np.percentile(regrets, q=max(50-percent_bad, 0), axis=0)
     low10 = np.percentile(regrets, q=q, axis=0)
-    high90 = np.percentile(regrets, q=100-(q-percent_bad), axis=0)
+    high90 = np.percentile(regrets, q=max(100-(q-percent_bad), 0), axis=0)
     return median, low10, high90
 
 
@@ -234,8 +273,8 @@ def plot_list_medquantile(datalist, title, legendlist=None, xlabel=None, ylabel=
 regretlist = []
 costs_list = []
 
-strat_rearranged =  [strategies[2], strategies[3], strategies[5], strategies[1], strategies[0]]
-res_rearranged =  [list_of_results[2], list_of_results[3], list_of_results[5], list_of_results[1], list_of_results[0]]
+strat_rearranged = [strategies[2], strategies[3], strategies[5], strategies[1], strategies[0], 'adaptive']
+res_rearranged = [list_of_results[2], list_of_results[3], list_of_results[5], list_of_results[1], list_of_results[0]]
 
 for name, result in zip(strat_rearranged, res_rearranged):
     regrets, errors, costs, _, bad_invocations = result
@@ -244,9 +283,15 @@ for name, result in zip(strat_rearranged, res_rearranged):
     regretlist.append(get_errorbars(regrets, q=10, percent_bad=percent_bad))
     costs_list.append(get_errorbars(costs, q=10, percent_bad=percent_bad))
 
+regretlist.append(get_errorbars(adapt_regret, q=10))
+costs_list.append(get_errorbars(adapt_cost, q=10))
+
+# TODO(@evinitsky) there's a bug in here!!! The plots don't match
 sns.set_palette("muted")
 plot_list_medquantile(regretlist, 'regret_v_iter.png', legendlist=strat_rearranged, xlabel="Iteration", ylabel="Regret")
-plot_list_medquantile(costs_list[:-1], 'cost_opt_v_iter.png', legendlist=strat_rearranged[:-1], xlabel="Iteration",
+del costs_list[-2]
+del strat_rearranged[-2]
+plot_list_medquantile(costs_list, 'cost_opt_v_iter.png', legendlist=strat_rearranged, xlabel="Iteration",
                       ylabel="Cost Suboptimality", semilogy=True, loc='upper right')
 
 

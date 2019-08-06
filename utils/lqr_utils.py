@@ -99,3 +99,8 @@ def check_stability(A, B, control):
     '''Confirm that the feedback matrix stabilizes the system'''
     mat = A + B @ control
     return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
+
+
+def sample_matrix(dim, bound):
+    """Returns a random dim x dim matrix with top eigenvalue bounded by dim * bound"""
+    return np.random.uniform(low=-bound, high=bound, size=(dim, dim))

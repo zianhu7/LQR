@@ -17,8 +17,6 @@ def env_args(parser):
     parser.add_argument("--eigv_high", type=float, default=2.0, help="Maximum absolute value of eigenvalue A can have. "
                                                                      "If A has an eigenvalue above this, we "
                                                                      "sample a new A.")
-    parser.add_argument("--elem_sample", type=int, default=1, help="If true, the elements of A and B are sampled "
-                                                                    "randomly")
     parser.add_argument("--eval_matrix", type=int, default=0, help="If this is true, the A and B matrices are fixed to"
                                                                     "the values from 'On the sample complexity of the "
                                                                     "linear quadratic regulator")
@@ -38,6 +36,11 @@ def env_args(parser):
     parser.add_argument("--rand_num_exp", type=int, default=1, help="If true, the max number of trials is sampled"
                                                                      "uniformly from 2 * dim to (horizon / exp_length "
                                                                      "Otherwise, the max num is horizon / exp length")
+    parser.add_argument("--regret_reward", type=int, default=0, help="If true, the reward is the negative of the regret"
+                                                                     "between the optimal controller and the synthesized"
+                                                                     "controller")
+    parser.add_argument('--use_lstm', type=int, default=0, help="If true, an LSTM is being used and the state space"
+                                                                "is just the current input-output pair")
 
 
 def GenLQRParserRLlib():

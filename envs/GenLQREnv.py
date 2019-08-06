@@ -7,7 +7,7 @@ from gym import spaces
 from numpy.linalg import inv
 from scipy.linalg import solve_discrete_are as sda
 
-from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost
+from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost, sample_matrix
 
 
 class GenLQREnv(gym.Env):
@@ -15,13 +15,9 @@ class GenLQREnv(gym.Env):
         '''
         Parameters
         =========
-        self.es: (bool)
-            If true randomly sample the elements of A and B with top eigenvalues of
-            self.eigv_high and min of -eigv_low. If false, sample diagonalizable
-            A and B with eigenvalues between eigv_low and eigv_high
         self.dim: (int)
             Dimension of the A and B matrices.
-        self.eval_matric: (np.ndarray)
+        self.eval_matrix: (np.ndarray)
             Hard-coded in matrix used to generate some of the figures
         self.full_ls: (bool)
             Whether to use all the input-output pairs (if true) in LS, or only the last
@@ -51,7 +47,6 @@ class GenLQREnv(gym.Env):
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
         self.dim = self.params["dim"]
-        self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
         self.eval_mode = self.params["eval_mode"]
         self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
@@ -80,32 +75,14 @@ class GenLQREnv(gym.Env):
         # TODO(@evinitsky) switch the conditions from observability and controllability to stabilizable/detectable
         self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
         if not self.eval_matrix:
-            if not self.es:
-                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low,
-                                                              high=self.eigv_high))
-                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
-                                                size=self.dim)
-                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
-                                                size=self.dim)
-                A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-                Q_sqrt = scipy.linalg.sqrtm(self.Q)
-                # Ensure PD A, controllable system
-                while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
-                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
-                                                    size=self.dim)
-                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
-                                                    size=self.dim)
-                    A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-                P_A, P_B = self.rvs(self.dim), self.rvs(self.dim)
-                self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T
-            else:
-                A = self.sample_matrix(self.eigv_high)
-                B = self.sample_matrix(self.eigv_high)
-                Q_sqrt = scipy.linalg.sqrtm(self.Q)
-                while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
-                    A = self.sample_matrix(self.eigv_high)
-                    B = self.sample_matrix(self.eigv_high)
-                self.A, self.B = A, B
+            # If true, we sample the elements randomly with maximal element self.eigv_high
+            A = sample_matrix(self.dim, self.eigv_high)
+            B = sample_matrix(self.dim, self.eigv_high)
+            Q_sqrt = scipy.linalg.sqrtm(self.Q)
+            while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
+                A = sample_matrix(self.dim, self.eigv_high)
+                B = sample_matrix(self.dim, self.eigv_high)
+            self.A, self.B = A, B
         else:
             self.A = np.array([[1.01, 0.01, 0], [0.01, 1.01, 0.01], [0, 0.01, 1.01]])
             self.B = np.eye(self.dim)
@@ -307,18 +284,3 @@ class GenLQREnv(gym.Env):
         self.epsilon_A = max([abs(e) for e in e_A])
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward
-
-    def sample_matrix(self, bound):
-        '''Return a random matrix'''
-
-        def generate():
-            mat = np.eye(self.dim)
-            for i in range(self.dim):
-                elems = np.random.uniform(low=-bound, high=bound, size=self.dim)
-                mat[i] = elems
-            return mat
-
-        rv = generate()
-        while np.linalg.matrix_rank(rv) != self.dim:
-            rv = generate()
-        return rv

@@ -86,7 +86,7 @@ if __name__ == '__main__':
     env_params = {"horizon": args.horizon, "exp_length": args.exp_length,
                   "reward_threshold":-abs(args.reward_threshold),
                   "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
-                  "elem_sample": args.elem_sample, "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
+                  "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
                   "dim": args.dim, "eval_mode": args.eval_mode, "analytic_optimal_cost": args.analytic_optimal_cost,
                   "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
     env_name = "GenLQREnv"
