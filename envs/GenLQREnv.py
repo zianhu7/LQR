@@ -5,9 +5,8 @@ import numpy as np
 import scipy
 from gym import spaces
 from numpy.linalg import inv
-from scipy.linalg import solve_discrete_are as sda
 
-from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost, sample_matrix
+from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost, sample_matrix, sda_estimate
 
 
 class GenLQREnv(gym.Env):
@@ -204,25 +203,18 @@ class GenLQREnv(gym.Env):
         A, B = theta[:, :self.dim].reshape((self.dim, -1)), theta[:, self.dim:].reshape((self.dim, -1))
         return A, B
 
-    def sda_estimate(self, A, B):
-        """Solve the discrete algebraic ricatti equation to compute the optimal feedback. """
-        Q, R = self.Q, self.R
-        X = sda(A, B, Q, R)
-        K = np.linalg.inv(R + B.T @ X @ B) @ B.T @ X @ A
-        return -K
-
     def calculate_reward(self):
         '''Return the difference between J and J*'''
         # Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
         A_est, B_est = self.ls_estimate()
         try:
-            K_hat = self.sda_estimate(A_est, B_est)
+            K_hat = sda_estimate(A_est, B_est, Q, R)
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
             return self.reward_threshold
-        K_true = self.sda_estimate(self.A, self.B)
+        K_true = sda_estimate(self.A, self.B, Q, R)
         r_true, r_hat = 0, 0
         x0 = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
         state_true = x0

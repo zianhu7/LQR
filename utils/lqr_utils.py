@@ -2,7 +2,15 @@
 
 import numpy as np
 from numpy.linalg import inv
+from scipy.linalg import solve_discrete_are as sda
 import scipy
+
+
+def sda_estimate(A, B, Q, R):
+    """Solve the discrete algebraic ricatti equation to compute the optimal feedback. """
+    X = sda(A, B, Q, R)
+    K = np.linalg.inv(R + B.T @ X @ B) @ B.T @ X @ A
+    return -K
 
 
 def spectral_radius(A):
@@ -60,6 +68,29 @@ def estimate_K(self, horizon, A, B):
         P_i = P_matrices[i + 1]
         K_matrices[i] = -np.matmul(inv(R + B.T @ P_i @ B), B.T @ P_i @ A)
     return K_matrices
+
+
+def dlqr(A,B,Q=None,R=None):
+    """Solve the discrete time lqr controller.
+
+    x[k+1] = A x[k] + B u[k]
+    cost = sum x[k].T*Q*x[k] + u[k].T*R*u[k]
+    """
+    #ref Bertsekas, p.151
+    if Q is None:
+        Q = np.eye(A.shape[0])
+    if R is None:
+        R = np.eye(B.shape[1])
+
+    P = scipy.linalg.solve_discrete_are(A, B, Q, R)
+    K = -scipy.linalg.solve(B.T.dot(P).dot(B) + R, B.T.dot(P).dot(A), sym_pos=True)
+
+    A_c = A + B.dot(K)
+    TOL = 1e-5
+    if spectral_radius(A_c) >= 1 + TOL:
+        print("WARNING: spectral radius of closed loop is:", spectral_radius(A_c))
+
+    return P, K
 
 
 def check_observability(A, C):

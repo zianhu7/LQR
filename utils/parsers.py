@@ -2,9 +2,43 @@ import argparse
 import json
 
 
-def env_args(parser):
+def regret_env_args(parser):
+    parser.add_argument("--eigv_low", type=float, default=0.5, help="Minimum absolute value of eigenvalue A can have. "
+                                                                    "If A has an eigenvalue below this, we "
+                                                                    "sample a new A.")
+    parser.add_argument("--eigv_high", type=float, default=2.0, help="Maximum absolute value of eigenvalue A can have. "
+                                                                     "If A has an eigenvalue above this, we "
+                                                                     "sample a new A.")
+    parser.add_argument("--eval_matrix", type=int, default=0, help="If this is true, the A and B matrices are fixed to"
+                                                                   "the values from 'On the sample complexity of the "
+                                                                   "linear quadratic regulator")
+    parser.add_argument("--horizon", type=int, default=2500, help="Maximum number of total steps for an identification "
+                                                                  "experiment.")
+    parser.add_argument("--dim", type=int, default=3, help="Dim of A and B matrices")
+    parser.add_argument("--gaussian_actions", type=int, default=0, help="If true, the actions are sampled from a "
+                                                                         "Gaussian with mean 0 and identity cov matrix "
+                                                                         "Otherwise, they are taken from the neural"
+                                                                         "network")
+    parser.add_argument("--obs_norm", type=float, default=1.0, help="The value by which to divide the observations")
+    parser.add_argument("--initial_samples", type=int, default=100, help="How many samples do we rollout the env before"
+                                                                         "experiment starts to pre-seed the A_nom, "
+                                                                         "B_nom estimates")
+    parser.add_argument("--prime_excitation_low", type=float, default=0.5, help="For the first dynamics estimate, "
+                                                                                "what is the magnitude of the excitation"
+                                                                                "noise. This is the lower bound"
+                                                                                "for the uniform sample of this value")
+    parser.add_argument("--prime_excitation_high", type=float, default=2.0, help="For the first dynamics estimate, "
+                                                                                "what is the magnitude of the excitation"
+                                                                                "noise. This is the upper bound"
+                                                                                "for the uniform sample of this value")
+    parser.add_argument("--cov_w", type=float, default=1.0, help="Std-dev of the gaussian from which we prime the estimates")
+    parser.add_argument("--dynamics_w", type=float, default=1.0, help="Std-dev of the Gaussian that perturbs the "
+                                                                      "dynamics of the system")
+
+
+def genlqr_env_args(parser):
     # ================================================================================================
-    #                    ENV PARAMS
+    #                    GEN LQR ENV PARAMS
     # ================================================================================================
     parser.add_argument("--horizon", type=int, default=120, help="Maximum number of total steps for an identification "
                                                                  "experiment.")
@@ -39,13 +73,11 @@ def env_args(parser):
     parser.add_argument("--regret_reward", type=int, default=0, help="If true, the reward is the negative of the regret"
                                                                      "between the optimal controller and the synthesized"
                                                                      "controller")
-    parser.add_argument('--use_lstm', type=int, default=0, help="If true, an LSTM is being used and the state space"
-                                                                "is just the current input-output pair")
 
 
 def GenLQRParserRLlib():
     parser = argparse.ArgumentParser()
-    env_args(parser)
+    genlqr_env_args(parser)
     # ================================================================================================
     #                    RLLIB PARAMS
     # ================================================================================================
@@ -65,7 +97,7 @@ def GenLQRParserRLlib():
 
 def GenLQRParserBaseline():
     parser = argparse.ArgumentParser()
-    env_args(parser)
+    genlqr_env_args(parser)
     # ================================================================================================
     #                    PARAMS
     # ================================================================================================
@@ -86,7 +118,7 @@ def GenLQRParserBaseline():
 def RolloutParser():
     """Used to rollout an environment a specified number of times"""
     parser = argparse.ArgumentParser()
-    env_args(parser)
+    genlqr_env_args(parser)
     parser.add_argument("--steps", type=int, default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", help="Output filename.")
     parser.add_argument("--append", type=int, default=1, help="If absent, files are written instead of appended")
@@ -115,6 +147,6 @@ def ReplayParser():
              "of a built-on algorithm (e.g. RLLib's DQN or PPO), or a "
              "user-defined trainable function or class registered in the "
              "tune registry.")
-    env_args(parser)
+    genlqr_env_args(parser)
 
     return parser
