@@ -59,7 +59,7 @@ if __name__ == '__main__':
     else:
         config["lr"] = 5e-4
     config["sgd_minibatch_size"] = 64
-    config["model"].update({"fcnet_hiddens": [256, 256, 256], "use_lstm": True}) # number of hidden layers in NN
+    config["model"].update({"fcnet_hiddens": [100, 50], "use_lstm": True, "lstm_cell_size": 64}) # number of hidden layers in NN
 
     # save the env params for later replay
     flow_json = json.dumps(env_params, sort_keys=True, indent=4)

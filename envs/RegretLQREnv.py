@@ -53,8 +53,8 @@ class RegretLQREnv(gym.Env):
         self.action_buffer.append(action)
         self.next_state_buffer.append(xnext)
         # WARNING: we cannot provide the controller with J_nom or the regret, as you need the true system to do this
-        self.A_hat, self.B_hat, self.cov = solve_least_squares(np.array(self.state_buffer), np.array(self.action_buffer),
-                                                                 np.array(self.next_state_buffer))
+        # self.A_hat, self.B_hat, self.cov = solve_least_squares(np.array(self.state_buffer), np.array(self.action_buffer),
+        #                                                          np.array(self.next_state_buffer))
         cost =  self._state_cur.dot(self.Q.dot(self._state_cur)) + action.dot(self.R.dot(action))
         # we take the negative of regret so that RL maximizing it decreases the regret. We also add on a constant
         # factor so that RL does not try to cause the rollout to end early
