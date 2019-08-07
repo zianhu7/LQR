@@ -24,6 +24,7 @@ class RegretLQREnv(gym.Env):
         self.prime_excitation = 0
         self.cov_w = self.params.get("cov_w", 1.0)  # the std-dev of the actions gaussian if gaussian_actions is True
         self.dynamics_w = self.params.get("dynamics_w", 1.0)  # the std-dev of the dynamics gaussian
+        self.done_norm_cond = self.params.get("done_norm_cond", 20)  # if the state norm exceeds this value, the rollout ends
         self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
         # State is state, action, unrolled A_nom matrix, unrolled B_nom matrix, cov matrix
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,
@@ -52,18 +53,24 @@ class RegretLQREnv(gym.Env):
         self.action_buffer.append(action)
         self.next_state_buffer.append(xnext)
         # WARNING: we cannot provide the controller with J_nom or the regret, as you need the true system to do this
-        self.A_hat, self.B_hat, self.cov = solve_least_squares(self.state_buffer, self.action_buffer,
-                                                                 self.next_state_buffer)
+        self.A_hat, self.B_hat, self.cov = solve_least_squares(np.array(self.state_buffer), np.array(self.action_buffer),
+                                                                 np.array(self.next_state_buffer))
         cost =  self._state_cur.dot(self.Q.dot(self._state_cur)) + action.dot(self.R.dot(action))
-        regret = cost - self.J_star
+        # we take the negative of regret so that RL maximizing it decreases the regret. We also add on a constant
+        # factor so that RL does not try to cause the rollout to end early
+        regret = - (cost - self.J_star) + 1
         self._state_cur = xnext
-        return self.construct_obs(self._state_cur, action) / self.obs_norm, -regret, False, {}
+        done = False
+        if np.linalg.norm(self._state_cur) > self.done_norm_cond:
+            done = True
+
+        return self.construct_obs(self._state_cur, action) / self.obs_norm, regret, done, {}
 
     def construct_obs(self, state, input):
         return np.concatenate((self.A_hat.reshape(-1), self.B_hat.reshape(-1), self.cov.reshape(-1), state, input))
 
     def update_dynamics(self, input):
-        return self.A.dot(self._state_cur) + self.B.dot(input) + self.dynamics * np.random.normal(size=(self.dim))
+        return self.A.dot(self._state_cur) + self.B.dot(input) + self.dynamics_w * np.random.normal(size=(self.dim))
 
     def prime(self):
         """Initialize the state-action buffer with 100 random samples"""
@@ -79,8 +86,9 @@ class RegretLQREnv(gym.Env):
             self._state_cur = xnext
 
         # compute the nominal estimates
-        self.A_hat, self.B_hat, self.cov = solve_least_squares(self.state_buffer, self.action_buffer,
-                                                                 self.next_state_buffer)
+        self.A_hat, self.B_hat, self.cov = solve_least_squares(np.array(self.state_buffer),
+                                                               np.array(self.action_buffer),
+                                                               np.array(self.next_state_buffer))
 
     def generate_system(self):
         """Generates the square A and B matrices. Guarantees that A and B form a controllable system"""

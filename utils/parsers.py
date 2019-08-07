@@ -34,6 +34,8 @@ def regret_env_args(parser):
     parser.add_argument("--cov_w", type=float, default=1.0, help="Std-dev of the gaussian from which we prime the estimates")
     parser.add_argument("--dynamics_w", type=float, default=1.0, help="Std-dev of the Gaussian that perturbs the "
                                                                       "dynamics of the system")
+    parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
+                                                                           "the rollout will end")
 
 
 def genlqr_env_args(parser):
@@ -74,13 +76,7 @@ def genlqr_env_args(parser):
                                                                      "between the optimal controller and the synthesized"
                                                                      "controller")
 
-
-def GenLQRParserRLlib():
-    parser = argparse.ArgumentParser()
-    genlqr_env_args(parser)
-    # ================================================================================================
-    #                    RLLIB PARAMS
-    # ================================================================================================
+def add_rllib_args(parser):
     parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
                                                     "with this name")
     parser.add_argument("--num_cpus", type=int, default=2, help="Number of CPUs to use in the trial")
@@ -92,15 +88,8 @@ def GenLQRParserRLlib():
     parser.add_argument("--num_samples", type=int, default=1, help="How many times to repeat each experiment")
     parser.add_argument("--grid_search", type=int, default=0, help="Do a tune grid search if true")
     parser.add_argument("--train_batch_size", type=int, default=30000, help="How many steps in a gradient batch")
-    return parser
 
-
-def GenLQRParserBaseline():
-    parser = argparse.ArgumentParser()
-    genlqr_env_args(parser)
-    # ================================================================================================
-    #                    PARAMS
-    # ================================================================================================
+def add_baseline_args(parser):
     parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
                                                     "with this name")
     parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs to use in the trial")
@@ -112,7 +101,33 @@ def GenLQRParserBaseline():
                                                                        "and consequently save it")
     parser.add_argument('--callback', type=int, default=1, help="Whether to save the model using a callback or just"
                                                                  "at the end of the training")
+
+def GenLQRParserRLlib():
+    parser = argparse.ArgumentParser()
+    genlqr_env_args(parser)
+    add_rllib_args(parser)
     return parser
+
+
+def RegretLQRParserRLlib():
+    parser = argparse.ArgumentParser()
+    regret_env_args(parser)
+    add_rllib_args(parser)
+    return parser
+
+
+def GenLQRParserBaseline():
+    parser = argparse.ArgumentParser()
+    genlqr_env_args(parser)
+    add_baseline_args(parser)
+    return parser
+
+def RegretLQRParserBaseline():
+    parser = argparse.ArgumentParser()
+    regret_env_args(parser)
+    add_baseline_args(parser)
+    return parser
+
 
 
 def RolloutParser():
