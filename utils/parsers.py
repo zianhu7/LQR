@@ -75,6 +75,8 @@ def genlqr_env_args(parser):
     parser.add_argument("--regret_reward", type=int, default=0, help="If true, the reward is the negative of the regret"
                                                                      "between the optimal controller and the synthesized"
                                                                      "controller")
+    parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
+                                                                           "the rollout will end")
 
 def add_rllib_args(parser):
     parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"

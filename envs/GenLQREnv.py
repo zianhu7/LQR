@@ -41,6 +41,8 @@ class GenLQREnv(gym.Env):
             If true, the total number of trials is randomly sampled between Uniform(2 * dim, horizon / exp_length)
         self.exp_length: (int)
             How long each trial is. Defaults to 6.
+        self.done_norm_cond: (float)
+            If the norm of the state exceeds this value, the experiment ends
         '''
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
@@ -55,6 +57,7 @@ class GenLQREnv(gym.Env):
         self.cov_w = self.params.get("cov_w", 1.0)
         self.rand_num_exp = self.params["rand_num_exp"]
         self.exp_length = self.params["exp_length"]
+        self.done_norm_cond = self.params.get("done_norm_cond", 20.0)
 
         # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
         # an actual Gaussian with covariance being the identity matrix.
@@ -65,7 +68,7 @@ class GenLQREnv(gym.Env):
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
                                             shape=(self.action_offset + (self.params["horizon"] + 1) * self.dim + 2,))
         # Track trajectory
-        self.reward_threshold = self.params["reward_threshold"]
+        self.reward_threshold = -abs(self.params["reward_threshold"])
 
     def generate_system(self):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
@@ -111,12 +114,18 @@ class GenLQREnv(gym.Env):
         self.states[self.curr_exp].append(list(new_state))
         self.inputs[self.curr_exp].append(a)
         completion = False
+        if np.linalg.norm(new_state) > self.done_norm_cond:
+            completion = True
         if self.horizon == self.timestep:
             completion = True
         if (self.timestep % self.exp_length == 0) and (not completion):
             self.reset_exp()
-        if completion:
+        # we got to the end of the horizon, compute the error on your estimates
+        if completion and self.horizon == self.timestep:
             reward = self.calculate_reward()
+        # we didn't get to the end, so we are penalized
+        elif completion and self.horizon != self.timestep:
+            reward = self.reward_threshold
         else:
             reward = 0
         return self.state, reward, completion, {}
@@ -207,9 +216,9 @@ class GenLQREnv(gym.Env):
         '''Return the difference between J and J*'''
         # Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
-        A_est, B_est = self.ls_estimate()
+        self.A_est, self.B_est = self.ls_estimate()
         try:
-            K_hat = sda_estimate(A_est, B_est, Q, R)
+            K_hat = sda_estimate(self.A_est, self.B_est, Q, R)
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
@@ -222,7 +231,6 @@ class GenLQREnv(gym.Env):
         if self.analytic_optimal_cost:
             is_stable = not check_stability(self.A, self.B, K_hat)
             if is_stable:
-                cov = np.eye(self.dim)
                 r_hat = LQR_cost(A, B, K_hat, Q, R, self.cov_w)
                 r_true = LQR_cost(A, B, K_true, Q, R, self.cov_w)
             # if we aren't stable under the true dynamics we go off to roughly infinity
@@ -252,8 +260,8 @@ class GenLQREnv(gym.Env):
             self.reward = reward
         self.inv_reward = -reward
         self.stable_res = not check_stability(self.A, self.B, K_hat)
-        _, e_A, _ = np.linalg.svd(A - A_est)
-        _, e_B, _ = np.linalg.svd(B - B_est)
+        _, e_A, _ = np.linalg.svd(A - self.A_est)
+        _, e_B, _ = np.linalg.svd(B - self.B_est)
         self.epsilon_A = max([abs(e) for e in e_A])
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward

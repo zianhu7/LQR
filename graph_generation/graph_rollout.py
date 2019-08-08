@@ -93,7 +93,8 @@ def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
                   "eigv_high": args.high,  "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "rand_num_exp": args.rand_num_exp,
-                  "gaussian_actions": args.gaussian_actions, "dim": 3}
+                  "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": True,
+                  "analytic_optimal_cost": True}
     return env_params
 
 
@@ -128,7 +129,7 @@ def run(args, parser, env_params):
     # pull in the params from training time and overwrite. If statement for backwards compatibility
     if len(config["env_config"]) > 0:
         base_params = config["env_config"]["env_params"]
-        env_params = merge_dicts(base_params, env_params)
+        env_params = merge_dicts(json.loads(base_params), env_params)
 
     config["env_config"] = env_params
     agent = cls(env=GenLQREnv, config=config)
@@ -256,9 +257,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.eigv_gen and args.eval_matrix:
         print("You can't test eigenvalue generalization and simultaneously have a fixed evaluation matrix")
-        exit()
-    if not args.eigv_gen and not args.eval_matrix:
-        print("You have to test at least one of args.eval_matrix or args.eigv_gen")
         exit()
 
     if args.clear_graphs:
@@ -402,7 +400,6 @@ if __name__ == "__main__":
                       "eval_mode": True}
         args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                        '../trained_policies/full_constrained_R3/checkpoint-2400'))
-        args.checkpoint = '/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-02-2019/dim3_full_ls/dim3_full_ls/PPO_GenLQREnv-v0_1_lr=0.001_2019-08-02_01-06-570jak_wrm/checkpoint_2500'
         args.high = env_params['eigv_high']
 
         run(args, parser, env_params)
