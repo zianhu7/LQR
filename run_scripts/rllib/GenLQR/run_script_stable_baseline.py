@@ -91,7 +91,7 @@ if __name__ == '__main__':
                   "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
     env_name = "GenLQREnv"
     if args.num_cpus == 1:
-        env_constructor = Monitor(create_env(env_name + '-v0', env_params), save_path, allow_early_resets=True)
+        env_constructor = Monitor(create_env(env_name + '-v0', env_params)(), save_path, allow_early_resets=True)
         env = DummyVecEnv([lambda: env_constructor])  # The algorithms require a vectorized environment to run
     else:
         env = SubprocVecEnv([create_env(env_name + '-v{}'.format(i), env_params) for i in range(args.num_cpus)])
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     model = PPO2('MlpPolicy', env, verbose=1, policy_kwargs=policy_kwargs,
                  n_steps=args.rollout_size, tensorboard_log=save_path, learning_rate=0.00025)
     if args.callback and args.num_cpus==1:
-        model.learn(total_timesteps=args.num_steps, callback=single_cpu_callback())
+        model.learn(total_timesteps=args.num_steps, callback=single_cpu_callback)
     else:
         model.learn(total_timesteps=args.num_steps)
 

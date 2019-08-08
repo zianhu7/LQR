@@ -237,5 +237,4 @@ if __name__ == "__main__":
             #irr_states[1].append(exp.synth_trajectory[0])
             #irr_inputs[0].append(exp.true_trajectory[1])
             #irr_inputs[1].append(exp.synth_trajectory[1])
-    #import ipdb; ipdb.set_trace()
         #'''

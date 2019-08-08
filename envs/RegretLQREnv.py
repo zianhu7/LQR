@@ -104,7 +104,7 @@ class RegretLQREnv(gym.Env):
             A = sample_matrix(self.dim, self.eigv_high)
             B = sample_matrix(self.dim, self.eigv_high)
             Q_sqrt = scipy.linalg.sqrtm(self.Q)
-            while not check_controllability(A, B) and not check_observability(A, Q_sqrt):
+            while not check_controllability(A, B) or not check_observability(A, Q_sqrt):
                 A = sample_matrix(self.dim, self.eigv_high)
                 B = sample_matrix(self.dim, self.eigv_high)
             self.A, self.B = A, B
