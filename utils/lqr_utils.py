@@ -133,5 +133,5 @@ def check_stability(A, B, control):
 
 
 def sample_matrix(dim, bound):
-    """Returns a random dim x dim matrix with top eigenvalue bounded by dim * bound"""
-    return np.random.uniform(low=-bound, high=bound, size=(dim, dim))
+    """Returns a random dim x dim matrix with top eigenvalue bounded by bound"""
+    return np.random.uniform(low=-bound / dim, high=bound / dim, size=(dim, dim))
