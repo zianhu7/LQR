@@ -10,7 +10,6 @@ import math
 
 import numpy as np
 
-from envs import GenLQREnv
 from matni_compare.python.adaptive import AdaptiveMethod
 import matni_compare.python.utils as utils
 
@@ -58,14 +57,12 @@ class AdaptiveInputStrategy(AdaptiveMethod):
 
         self.agent = agent
 
-        self.env = GenLQREnv(env_params)
-
     def _get_logger(self):
         return self._logger
 
     def reset(self, rng):
         super().reset(rng)
-        self.env.reset()
+        self.last_action = np.zeros(3)  #todo(@evinitsky) remove hardcoding
         self._explore_stddev_history = []
 
     def _on_iteration_completion(self):
@@ -76,8 +73,9 @@ class AdaptiveInputStrategy(AdaptiveMethod):
         logger = self._get_logger()
 
         # do a least squares fit and controller based on the nominal
-        Anom, Bnom, _ = utils.solve_least_squares(states, inputs, transitions, reg=self._reg)
-        _, K = utils.dlqr(Anom, Bnom, self._Q, self._R)
+        # TODO(@evinitsky) should we allow this to be updated?
+        self.Anom, self.Bnom, self.cov = utils.solve_least_squares(states, inputs, transitions, reg=self._reg)
+        _, K = utils.dlqr(self.Anom, self.Bnom, self._Q, self._R)
         self._current_K = K
 
         # compute the infinite horizon cost of this controller
@@ -90,7 +88,7 @@ class AdaptiveInputStrategy(AdaptiveMethod):
             self._epoch_idx + 1 if self._has_primed else 0,
             rho_true))
 
-        return (Anom, Bnom, Jnom)
+        return (self.Anom, self.Bnom, Jnom)
 
     def _epoch_length(self):
         if self._epoch_schedule == 'linear':
@@ -115,19 +113,10 @@ class AdaptiveInputStrategy(AdaptiveMethod):
 
     # We use the nominal controller but with the exploratory action selected from our policy
     def _get_input(self, state, rng):
-        rng = self._get_rng(rng)
-        ctrl_input = self._current_K.dot(state)
-        explore_input = self.agent.compute_action(self.env.state)
-        final_action = explore_input
+        # TODO(@evinitsky) THIS MODEL IS RECURRENT! You need to treat it like it's recurrent
+        obs = np.concatenate((self.A_nom.reshape(-1), self.B_nom.reshape(-1), self.cov.reshape(-1), state, self.last_action))
+        final_action = self.agent.compute_action(obs)
 
-        # # Explore in a weighted mixture between the agent and the nominal controller
-        # explore_input *= self._explore_stddev() / np.linalg.norm(explore_input)
-        # final_action = ctrl_input + explore_input
-
-        # Update the state of the agent
-        self.env.update_state(state)
-        self.env.update_action(final_action)
-        # Update the env so all of the tracking is done correctly
-        self.env.step(final_action)
+        self.last_action = final_action
 
         return final_action

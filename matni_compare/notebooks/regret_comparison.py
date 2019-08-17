@@ -14,7 +14,7 @@ from ray.rllib.agents.registry import get_agent_class
 import seaborn as sns
 sns.set_style('ticks')
 
-from envs import GenLQREnv
+from envs import RegretLQREnv
 from matni_compare.python import utils
 from matni_compare.python import examples
 from matni_compare.python.adaptiveinput import AdaptiveInputStrategy
@@ -119,7 +119,7 @@ def sls_cl_ctor():
                   actual_error_multiplier=1, rls_lam=None)
 
 
-checkpoint_path = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-02-2019/dim3_full_ls/dim3_full_ls/PPO_GenLQREnv-v0_1_lr=0.001_2019-08-02_01-06-570jak_wrm/checkpoint_2500"
+checkpoint_path = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-16-2019/dim3_full_ls_regret_d100/dim3_full_ls_regret_d100/PPO_RegretLQREnv-v0_1_lr=0.001_2019-08-16_03-21-2872__udt8/checkpoint_1000"
 # Run the adaptive input methods
 # TODO parallelize. It's kind of hard though because of rllib.
 # set up the agent
@@ -143,15 +143,17 @@ if "num_workers" in config:
 config['num_workers'] = 1
 
 # Set up the env
-env_params = {"horizon": horizon, "exp_length": 6,
-              "reward_threshold": -10,
-              "eigv_low": 0, "eigv_high": 20,
-              "eval_matrix": 1, "full_ls": 1,
-              "dim": 3, "eval_mode": 1, "analytic_optimal_cost": 1,
-              "gaussian_actions": 0, "rand_num_exp": 0}
+# figure out a way not to hard code this
+env_params = {"horizon": args.horizon,
+                  "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
+                  "eval_matrix": args.eval_matrix, "initial_samples": args.initial_samples,
+                  "dim": args.dim, "prime_excitation_low": args.prime_excitation_low,
+                  "prime_excitation_high": args.prime_excitation_high, "cov_w": args.cov_w,
+                  "gaussian_actions": args.gaussian_actions, "dynamics_w": args.dynamics_w,
+                  "obs_norm": args.obs_norm}
 cls = get_agent_class('PPO')
 config["env_config"] = env_params
-agent = cls(env=GenLQREnv, config=config)
+agent = cls(env=RegretLQREnv, config=config)
 agent.restore(os.path.join(checkpoint_path, os.path.basename(checkpoint_path).replace('_', '-')))
 
 
