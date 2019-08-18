@@ -38,7 +38,7 @@ if __name__ == '__main__':
                   "dim": args.dim, "prime_excitation_low": args.prime_excitation_low,
                   "prime_excitation_high": args.prime_excitation_high, "cov_w": args.cov_w,
                   "gaussian_actions": args.gaussian_actions, "dynamics_w": args.dynamics_w,
-                  "obs_norm": args.obs_norm}
+                  "obs_norm": args.obs_norm, "done_norm_cond": args.done_norm_cond}
 
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus

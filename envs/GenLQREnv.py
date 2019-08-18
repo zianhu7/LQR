@@ -54,10 +54,10 @@ class GenLQREnv(gym.Env):
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
         #self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
-        self.cov_w = self.params.get("cov_w", 1.0)
+        self.cov_w = self.params.get("cov_w")
         self.rand_num_exp = self.params["rand_num_exp"]
         self.exp_length = self.params["exp_length"]
-        self.done_norm_cond = self.params.get("done_norm_cond", 20.0)
+        self.done_norm_cond = self.params.get("done_norm_cond")
 
         # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
         # an actual Gaussian with covariance being the identity matrix.

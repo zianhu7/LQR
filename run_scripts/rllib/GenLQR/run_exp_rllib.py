@@ -38,7 +38,8 @@ if __name__ == '__main__':
                   "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
                   "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
                   "dim": args.dim, "eval_mode": args.eval_mode, "analytic_optimal_cost": args.analytic_optimal_cost,
-                  "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp}
+                  "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp,
+                  "done_norm_cond": args.done_norm_cond, "cov_w": args.cov_w}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus
     if args.multi_node:
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     if args.grid_search:
         config["lr"] = grid_search([1e-4, 1e-3])
     else:
-        config["lr"] = 5e-4
+        config["lr"] = 1e-3
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 

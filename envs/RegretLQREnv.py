@@ -17,14 +17,14 @@ class RegretLQREnv(gym.Env):
         self.dim = self.params["dim"]
         self.eval_matrix = self.params["eval_matrix"]
         self.gaussian_actions = self.params["gaussian_actions"]
-        self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
+        self.obs_norm = self.params.get("obs_norm")  # Value we normalize the observations by
         self.initial_samples = self.params.get("initial_samples", 100)  # how many samples we initialize the buffer with
-        self.prime_excitation_low = self.params.get("prime_excitation_low", 0.5)  # lower bound on the exploration factor for initial rollouts
-        self.prime_excitation_high = self.params.get("prime_excitation_high", 3.0)  # upper bound on the exploration factor for initial rollouts
+        self.prime_excitation_low = self.params.get("prime_excitation_low")  # lower bound on the exploration factor for initial rollouts
+        self.prime_excitation_high = self.params.get("prime_excitation_high")  # upper bound on the exploration factor for initial rollouts
         self.prime_excitation = 0
-        self.cov_w = self.params.get("cov_w", 1.0)  # the std-dev of the actions gaussian if gaussian_actions is True
-        self.dynamics_w = self.params.get("dynamics_w", 1.0)  # the std-dev of the dynamics gaussian
-        self.done_norm_cond = self.params.get("done_norm_cond", 20)  # if the state norm exceeds this value, the rollout ends
+        self.cov_w = self.params.get("cov_w")  # the std-dev of the actions gaussian if gaussian_actions is True
+        self.dynamics_w = self.params.get("dynamics_w")  # the std-dev of the dynamics gaussian
+        self.done_norm_cond = self.params.get("done_norm_cond")  # if the state norm exceeds this value, the rollout ends
         self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
         # State is state, action, unrolled A_nom matrix, unrolled B_nom matrix, cov matrix
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,

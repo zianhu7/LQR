@@ -75,6 +75,7 @@ def genlqr_env_args(parser):
     parser.add_argument("--regret_reward", type=int, default=0, help="If true, the reward is the negative of the regret"
                                                                      "between the optimal controller and the synthesized"
                                                                      "controller")
+    parser.add_argument("--cov_w", type=float, default=1.0, help="Std-dev of the gaussian from which we prime the estimates")
     parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
                                                                            "the rollout will end")
 

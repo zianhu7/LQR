@@ -2,10 +2,10 @@
 
 # This script is used to spin up and run the rllib experiments
 
-ray exec ../../../ray_autoscale.yaml "python LQR/run_scripts/rllib/GenLQR/run_exp_rllib.py dim3_full_ls_10000cond --full_ls 1 --dim 3 \
+ray exec ../../../ray_autoscale.yaml "python LQR/run_scripts/rllib/GenLQR/run_exp_rllib.py dim3_full_ls_100cond --full_ls 1 --dim 3 \
     --rand_num_exp 1 --num_cpus 36 --use_s3 1 --checkpoint_freq 100 --num_iters 2500 --multi_node 1 --grid_search 1 --num_samples 2\
-    --done_norm_cond 10000.0 --eigv_high 1.0" \
-    --start --stop --cluster-name 500_fls --tmux
+    --done_norm_cond 100.0 --eigv_high 1.0" \
+    --start --stop --cluster-name 100_fls --tmux
 #ray exec ../../../ray_autoscale.yaml "python LQR/run_scripts/rllib/GenLQR/run_exp_rllib.py dim3_full_ls_500cond --full_ls 1 --dim 3 \
 #--rand_num_exp 1 --num_cpus 36 --use_s3 1 --checkpoint_freq 100 --num_iters 2500 --multi_node 1 --grid_search 1 --num_samples 2\
 #--done_norm_cond 500.0" \
