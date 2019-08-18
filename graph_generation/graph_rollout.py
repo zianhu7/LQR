@@ -94,7 +94,7 @@ def create_env_params(args):
                   "eigv_high": args.high,  "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "rand_num_exp": args.rand_num_exp,
                   "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": True,
-                  "analytic_optimal_cost": True}
+                  "analytic_optimal_cost": True, "done_norm_cond": 500}
     return env_params
 
 
@@ -127,9 +127,9 @@ def run(args, parser, env_params):
     cls = get_agent_class(args.run)
 
     # pull in the params from training time and overwrite. If statement for backwards compatibility
-    if len(config["env_config"]) > 0:
-        base_params = config["env_config"]["env_params"]
-        env_params = merge_dicts(json.loads(base_params), env_params)
+    # if len(config["env_config"]) > 0:
+    #     base_params = config["env_config"]["env_params"]
+    #     env_params = merge_dicts(json.loads(base_params), env_params)
 
     config["env_config"] = env_params
     agent = cls(env=GenLQREnv, config=config)
