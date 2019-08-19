@@ -43,6 +43,8 @@ class GenLQREnv(gym.Env):
             How long each trial is. Defaults to 6.
         self.done_norm_cond: (float)
             If the norm of the state exceeds this value, the experiment ends
+        self.full_rank: (bool)
+            If true, A and B are full rank
         '''
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
@@ -58,6 +60,7 @@ class GenLQREnv(gym.Env):
         self.rand_num_exp = self.params["rand_num_exp"]
         self.exp_length = self.params["exp_length"]
         self.done_norm_cond = self.params.get("done_norm_cond")
+        self.full_rank = self.params["full_rank"]
 
         # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
         # an actual Gaussian with covariance being the identity matrix.
@@ -82,8 +85,8 @@ class GenLQREnv(gym.Env):
             B = sample_matrix(self.dim, self.eigv_high)
             Q_sqrt = scipy.linalg.sqrtm(self.Q)
             while not check_controllability(A, B) or not check_observability(A, Q_sqrt):
-                A = sample_matrix(self.dim, self.eigv_high)
-                B = sample_matrix(self.dim, self.eigv_high)
+                A = sample_matrix(self.dim, self.eigv_high, full_rank=self.full_rank)
+                B = sample_matrix(self.dim, self.eigv_high, full_rank=self.full_rank)
             self.A, self.B = A, B
         else:
             self.A = np.array([[1.01, 0.01, 0], [0.01, 1.01, 0.01], [0, 0.01, 1.01]])

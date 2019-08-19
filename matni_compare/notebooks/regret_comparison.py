@@ -119,7 +119,8 @@ def sls_cl_ctor():
                   actual_error_multiplier=1, rls_lam=None)
 
 
-checkpoint_path = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-16-2019/dim3_full_ls_regret_d100/dim3_full_ls_regret_d100/PPO_RegretLQREnv-v0_1_lr=0.001_2019-08-16_03-21-2872__udt8/checkpoint_1000"
+checkpoint_path = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-16-2019/dim3_full_ls_regret_d100/" \
+                  "dim3_full_ls_regret_d100/PPO_RegretLQREnv-v0_1_lr=0.001_2019-08-16_03-21-2872__udt8/checkpoint_2100"
 # Run the adaptive input methods
 # TODO parallelize. It's kind of hard though because of rllib.
 # set up the agent
@@ -144,13 +145,13 @@ config['num_workers'] = 1
 
 # Set up the env
 # figure out a way not to hard code this
-env_params = {"horizon": args.horizon,
-                  "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
-                  "eval_matrix": args.eval_matrix, "initial_samples": args.initial_samples,
-                  "dim": args.dim, "prime_excitation_low": args.prime_excitation_low,
-                  "prime_excitation_high": args.prime_excitation_high, "cov_w": args.cov_w,
-                  "gaussian_actions": args.gaussian_actions, "dynamics_w": args.dynamics_w,
-                  "obs_norm": args.obs_norm}
+env_params = {"horizon": horizon,
+              "eigv_low": 0, "eigv_high": 10,
+              "eval_matrix": 0, "initial_samples": 1,
+              "dim": A_star.shape[0], "prime_excitation_low": 0.5,
+              "prime_excitation_high": 2.0, "cov_w": 1.0,
+              "gaussian_actions": 0, "dynamics_w": 1.0,
+              "obs_norm": 1.0, "done_norm_cond": 1000}
 cls = get_agent_class('PPO')
 config["env_config"] = env_params
 agent = cls(env=RegretLQREnv, config=config)

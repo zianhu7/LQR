@@ -6,7 +6,7 @@ def regret_env_args(parser):
     parser.add_argument("--eigv_low", type=float, default=0.5, help="Minimum absolute value of eigenvalue A can have. "
                                                                     "If A has an eigenvalue below this, we "
                                                                     "sample a new A.")
-    parser.add_argument("--eigv_high", type=float, default=2.0, help="Maximum absolute value of eigenvalue A can have. "
+    parser.add_argument("--eigv_high", type=float, default=1.0, help="Maximum absolute value of eigenvalue A can have. "
                                                                      "If A has an eigenvalue above this, we "
                                                                      "sample a new A.")
     parser.add_argument("--eval_matrix", type=int, default=0, help="If this is true, the A and B matrices are fixed to"
@@ -36,7 +36,6 @@ def regret_env_args(parser):
                                                                       "dynamics of the system")
     parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
                                                                            "the rollout will end")
-
 
 def genlqr_env_args(parser):
     # ================================================================================================
@@ -78,6 +77,8 @@ def genlqr_env_args(parser):
     parser.add_argument("--cov_w", type=float, default=1.0, help="Std-dev of the gaussian from which we prime the estimates")
     parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
                                                                            "the rollout will end")
+    parser.add_argument("--full_rank", type=int, default=0,
+                        help="If true, both A and B matrices will be full rank")
 
 def add_rllib_args(parser):
     parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"

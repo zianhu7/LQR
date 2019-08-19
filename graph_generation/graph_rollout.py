@@ -77,8 +77,11 @@ def create_parser(parser_creator=None):
 
     parser.add_argument("--gaussian_actions", action="store_true", help="Run env with "
                                                                         "standard normal actions")
+    parser.add_argument("--cov_w", type=float, default=1.0, help="Std-dev of the gaussian from which we prime the estimates")
     parser.add_argument("--create_all_graphs", action="store_true", help="Create all the"
                                                                          " graphs for the paper")
+    parser.add_argument("--full_rank", type=int, default=0,
+                        help="If true, both A and B matrices will be full rank")
     parser.add_argument("--clear_graphs", action="store_true", help="Remove graphs from output folder")
     parser.add_argument(
         "--config",
@@ -94,7 +97,8 @@ def create_env_params(args):
                   "eigv_high": args.high,  "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "rand_num_exp": args.rand_num_exp,
                   "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": True,
-                  "analytic_optimal_cost": True, "done_norm_cond": 500}
+                  "analytic_optimal_cost": True, "done_norm_cond": 500, "cov_w": args.cov_w,
+                  "full_rank": args.full_rank}
     return env_params
 
 

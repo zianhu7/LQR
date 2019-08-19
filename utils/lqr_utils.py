@@ -132,6 +132,10 @@ def check_stability(A, B, control):
     return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
 
 
-def sample_matrix(dim, bound):
+def sample_matrix(dim, bound, full_rank=False):
     """Returns a random dim x dim matrix with top eigenvalue bounded by bound * dim"""
-    return np.random.uniform(low=-bound, high=bound, size=(dim, dim))
+    mat = np.random.uniform(low=-bound, high=bound, size=(dim, dim))
+    if full_rank:
+        while np.linalg.matrix_rank(mat) != dim:
+            mat = np.random.uniform(low=-bound, high=bound, size=(dim, dim))
+    return mat

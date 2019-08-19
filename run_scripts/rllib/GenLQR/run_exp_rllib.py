@@ -39,7 +39,7 @@ if __name__ == '__main__':
                   "eval_matrix": args.eval_matrix, "full_ls": args.full_ls,
                   "dim": args.dim, "eval_mode": args.eval_mode, "analytic_optimal_cost": args.analytic_optimal_cost,
                   "gaussian_actions": args.gaussian_actions, "rand_num_exp": args.rand_num_exp,
-                  "done_norm_cond": args.done_norm_cond, "cov_w": args.cov_w}
+                  "done_norm_cond": args.done_norm_cond, "cov_w": args.cov_w, "full_rank": args.full_rank}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus
     if args.multi_node:

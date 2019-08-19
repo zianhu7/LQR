@@ -5,11 +5,11 @@ cluster_name: eugene_test #<YOUR NAME>
 
 # The minimum number of workers nodes to launch in addition to the head
 # node. This number should be >= 0.
-min_workers: 3 #<NUM WORKERS IN CLUSTER>
+min_workers: 1 #<NUM WORKERS IN CLUSTER>
 
 # The maximum number of workers nodes to launch in addition to the head
 # node. This takes precedence over min_workers.
-max_workers: 3
+max_workers: 1
 
 initial_workers: 0
 
