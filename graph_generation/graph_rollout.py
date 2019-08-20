@@ -11,6 +11,7 @@ import pickle
 
 import gym
 from gym.envs.registration import register
+import numpy as np
 import ray
 from ray.rllib.agents.registry import get_agent_class
 from ray.rllib.models import ModelCatalog
@@ -105,9 +106,10 @@ def create_parser(parser_creator=None):
 
 def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                  "eigv_high": args.high, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
+                  "eigv_high": 2.0, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "gen_num_exp": args.gen_num_exp,
-                  "gaussian_actions": args.gaussian_actions, "dim": 3}
+                  "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": False,
+                  "analytic_optimal_cost": True}
     return env_params
 
 
@@ -139,15 +141,20 @@ def run(args, parser, env_params):
     agent.restore(args.checkpoint)
     num_steps = int(args.steps)
 
-    if hasattr(agent, "local_evaluator"):
-        env = agent.local_evaluator.env
-    else:
-        env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
+    # if hasattr(agent, "local_evaluator"):
+    #     env = agent.local_evaluator.env
+    # else:
+    #     env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
+    env = agent.workers.local_worker().env
+    env.__init__(env_params)
+    print(env.eigv_high)
+    print(env.gaussian_actions)
     if args.out is not None:
         rollouts = []
     steps = 0
     total_stable = 0
     episode_reward = 0
+    rewards = []
     while steps < (num_steps or steps + 1):
         if args.out is not None:
             rollout = []
@@ -163,6 +170,7 @@ def run(args, parser, env_params):
                 rollout.append([state, action, next_state, reward, done])
             steps += 1
             state = next_state
+        rewards.append(reward)
         env_obj = env.unwrapped
         if args.eval_matrix:
             write_val = str(env_obj.num_exp) + ' ' \
@@ -210,7 +218,8 @@ def run(args, parser, env_params):
         if args.out is not None:
             rollouts.append(rollout)
 
-    graph(args, env_params)
+        print('the average reward was {}'.format(np.mean(rewards)))
+    # graph(args, env_params)
 
 
 def graph(args, env_params):
@@ -380,13 +389,12 @@ if __name__ == "__main__":
         full_ls = False
         args.out = 'dim3_partial_constrained_gen'
         env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                      "eigv_high": 20, "elem_sample": True, "eval_matrix": args.eval_matrix,
+                      "eigv_high": 2, "elem_sample": True, "eval_matrix": args.eval_matrix,
                       "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
                       "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True,
-                      "eval_mode": True}
+                      "eval_mode": False}
         register_env(env_name, lambda env_config: create_env(env_config))
-        args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                       '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        args.checkpoint = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-20-2019/dim3_full_ls_1000000cond_fullrank/dim3_full_ls_1000000cond_fullrank/PPO_GenLQREnv-v0_1_2019-08-20_00-34-047js2qpm3/checkpoint_600/checkpoint-600"
         args.high = env_params['eigv_high']
 
         run(args, parser, env_params)
@@ -474,4 +482,5 @@ if __name__ == "__main__":
         # register_env(env_name, lambda env_config: create_env(env_config))
         # run(args, parser, env_params)
     else:
+        register_env(env_name, lambda env_config: create_env(env_config))
         run(args, parser, env_params)
