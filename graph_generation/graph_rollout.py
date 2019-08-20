@@ -106,9 +106,9 @@ def create_parser(parser_creator=None):
 
 def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                  "eigv_high": 2.0, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
+                  "eigv_high": 1.0, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "gen_num_exp": args.gen_num_exp,
-                  "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": False,
+                  "gaussian_actions": True, "dim": 3, "eval_mode": False,
                   "analytic_optimal_cost": True}
     return env_params
 
@@ -147,6 +147,7 @@ def run(args, parser, env_params):
     #     env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
     env = agent.workers.local_worker().env
     env.__init__(env_params)
+    import ipdb; ipdb.set_trace()
     print(env.eigv_high)
     print(env.gaussian_actions)
     if args.out is not None:

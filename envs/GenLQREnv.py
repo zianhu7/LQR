@@ -117,6 +117,8 @@ class GenLQREnv(gym.Env):
             reward = self.calculate_reward()
         else:
             reward = 0
+        if completion:
+            print(self.timestep)
         return self.state, reward, completion, {}
 
     def reset_exp(self):
