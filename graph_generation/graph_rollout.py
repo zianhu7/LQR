@@ -77,18 +77,18 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--high", type=float, nargs='+', default=1,
+    parser.add_argument("--high", type=float, nargs='+', default=2,
                         help="upper bound for eigenvalue initialization")
-    parser.add_argument("--eval_matrix", type=bool, default=False,
+    parser.add_argument("--eval_matrix", type=int, default=0,
                         help="Whether to benchmark on `Sample complexity of quadratic "
                              "regulator` system for R3")
-    parser.add_argument("--eigv_gen", type=bool, default=False,
+    parser.add_argument("--eigv_gen", type=int, default=0,
                         help="Eigenvalue generalization tests for eigenvalues of A")
-    parser.add_argument("--opnorm_error", type=bool, default=False,
+    parser.add_argument("--opnorm_error", type=int, default=0,
                         help="Operator norm error of (A-A_est)")
-    parser.add_argument("--full_ls", type=bool, default=True,
+    parser.add_argument("--full_ls", type=int, default=1,
                         help="Sampling type")
-    parser.add_argument("--es", type=bool, default=True, help="Element sampling")
+    parser.add_argument("--es", type=int, default=1, help="Element sampling")
     parser.add_argument("--gen_num_exp", type=int, default=0, help="If 0, the number of experiments is varied")
     parser.add_argument("--gaussian_actions", action="store_true", help="Run env with "
                                                                         "standard normal actions")
@@ -108,12 +108,14 @@ def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
                   "eigv_high": 1.0, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "gen_num_exp": args.gen_num_exp,
-                  "gaussian_actions": True, "dim": 3, "eval_mode": False,
+                  "gaussian_actions": False, "dim": 3, "eval_mode": False,
                   "analytic_optimal_cost": True}
     return env_params
 
 
 def run(args, parser, env_params):
+    assert (args.eigv_gen or args.eval_matrix) and not (args.eigv_gen and args.eval_matrix), \
+        print('either eval matrix or eigv_gen must be true, but both cant simultaneously be true')
     config = args.config
     if not config:
         # Load configuration from file
@@ -147,7 +149,6 @@ def run(args, parser, env_params):
     #     env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
     env = agent.workers.local_worker().env
     env.__init__(env_params)
-    import ipdb; ipdb.set_trace()
     print(env.eigv_high)
     print(env.gaussian_actions)
     if args.out is not None:

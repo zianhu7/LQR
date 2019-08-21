@@ -117,8 +117,6 @@ class GenLQREnv(gym.Env):
             reward = self.calculate_reward()
         else:
             reward = 0
-        if completion:
-            print(self.timestep)
         return self.state, reward, completion, {}
 
     def reset_exp(self):
@@ -299,7 +297,6 @@ class GenLQREnv(gym.Env):
             self.reward = max(self.reward_threshold, reward)
         else:
             self.reward = reward
-        print(self.reward)
         self.inv_reward = -reward
         self.stable_res = not self.check_stability(K_hat)
         _, e_A, _ = np.linalg.svd(A - A_est)
