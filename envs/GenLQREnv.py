@@ -314,7 +314,7 @@ class GenLQREnv(gym.Env):
         '''Check that the controllability matrix is full rank'''
         dim = self.dim
         stack = []
-        for i in range(dim - 1):
+        for i in range(dim):
             term = B @ np.linalg.matrix_power(A, i)
             stack.append(term)
         gramian = np.hstack(stack)
