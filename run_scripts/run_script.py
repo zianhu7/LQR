@@ -36,7 +36,7 @@ if __name__ == '__main__':
                   "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
                   "elem_sample": True, "eval_matrix": False, "full_ls": args.full_ls,
                   "dim": args.dim, "eval_mode": False, "analytic_optimal_cost": args.analytic_optimal_cost,
-                  "gaussian_actions": args.gaussian_actions, "gen_num_exp": 0}
+                  "gaussian_actions": False, "gen_num_exp": args.gen_num_exp}
 
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus
@@ -46,7 +46,7 @@ if __name__ == '__main__':
         ray.init()
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = args.train_batch_size
-    config["num_sgd_iter"]=10
+    config["num_sgd_iter"] = 10
     config["num_workers"] = args.num_cpus
     config["gamma"] = 0.95
     config["horizon"] = args.horizon

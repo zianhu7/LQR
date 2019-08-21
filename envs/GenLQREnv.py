@@ -263,7 +263,10 @@ class GenLQREnv(gym.Env):
         # for i in range(self.num_exp):
         # state_true, state_hat = self.states[i][0], self.states[i][0]
         # true_traj[0].append(state_true); synth_traj[0].append(state_hat)
+        # TODO(@evinitsky) put this back!!
         x0 = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
+        # x0 = np.random.uniform(low=0.1, high=10, size=(self.dim,))
+        # x0 = np.zeros(self.dim)
         state_true = x0
         state_hat = np.copy(x0)
         if self.analytic_optimal_cost:
@@ -279,6 +282,8 @@ class GenLQREnv(gym.Env):
         else:
             for _ in range(self.exp_length):
                 # Update r_hat
+                # TODO(@evinitsky) put this back!!
+                #noise = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
                 noise = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
                 u_hat = K_hat @ state_hat
                 r_hat += state_hat.T @ Q @ state_hat + u_hat.T @ R @ u_hat
