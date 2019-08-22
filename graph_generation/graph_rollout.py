@@ -77,7 +77,7 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=10000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--high", type=float, nargs='+', default=2,
+    parser.add_argument("--high", type=int, default=2,
                         help="upper bound for eigenvalue initialization")
     parser.add_argument("--eval_matrix", type=int, default=0,
                         help="Whether to benchmark on `Sample complexity of quadratic "
@@ -88,9 +88,10 @@ def create_parser(parser_creator=None):
                         help="Operator norm error of (A-A_est)")
     parser.add_argument("--full_ls", type=int, default=1,
                         help="Sampling type")
+    parser.add_argument("--write_mode", type=str, default="a", help="use w to overwrite, a to append")
     parser.add_argument("--es", type=int, default=1, help="Element sampling")
     parser.add_argument("--gen_num_exp", type=int, default=0, help="If 0, the number of experiments is varied")
-    parser.add_argument("--gaussian_actions", action="store_true", help="Run env with "
+    parser.add_argument("--gaussian_actions", type=int, default=0, help="Run env with "
                                                                         "standard normal actions")
     parser.add_argument("--create_all_graphs", action="store_true", help="Create all the"
                                                                          " graphs for the paper")
@@ -106,9 +107,9 @@ def create_parser(parser_creator=None):
 
 def create_env_params(args):
     env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                  "eigv_high": 1.0, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
+                  "eigv_high": args.high, "elem_sample": args.es, "eval_matrix": args.eval_matrix,
                   "full_ls": args.full_ls, "gen_num_exp": args.gen_num_exp,
-                  "gaussian_actions": False, "dim": 3, "eval_mode": False,
+                  "gaussian_actions": args.gaussian_actions, "dim": 3, "eval_mode": True,
                   "analytic_optimal_cost": True}
     return env_params
 
@@ -143,12 +144,16 @@ def run(args, parser, env_params):
     agent.restore(args.checkpoint)
     num_steps = int(args.steps)
 
-    # if hasattr(agent, "local_evaluator"):
-    #     env = agent.local_evaluator.env
-    # else:
-    #     env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
-    env = agent.workers.local_worker().env
-    env.__init__(env_params)
+    if hasattr(agent, "local_evaluator"):
+        env = agent.local_evaluator.env
+    else:
+        env = ModelCatalog.get_preprocessor_as_wrapper(gym.make(args.env))
+    # Just check that the env actually has the settings you want.
+    for k, v in env_params.items():
+        assert getattr(env, k) == v, print('the values of {} do no match. The env has value {} and'
+                                           ' you passed {}'.format(k, getattr(env, k), v))
+    # env = agent.workers.local_worker().env
+    # env.__init__(env_params)
     print(env.eigv_high)
     print(env.gaussian_actions)
     if args.out is not None:
@@ -157,6 +162,9 @@ def run(args, parser, env_params):
     total_stable = 0
     episode_reward = 0
     rewards = []
+    eval_str_list = []
+    eigv_str_list = []
+    op_norm_str_list = []
     while steps < (num_steps or steps + 1):
         if args.out is not None:
             rollout = []
@@ -177,29 +185,12 @@ def run(args, parser, env_params):
         if args.eval_matrix:
             write_val = str(env_obj.num_exp) + ' ' \
                         + str(env_obj.rel_reward) + ' ' + str(env_obj.stable_res) + '\n'
-            if args.out is not None:
-                with open('output_files/{}_eval_matrix_benchmark.txt'.format(args.out), 'a') as f:
-                    f.write(write_val)
-            else:
-                if not args.gaussian_actions:
-                    with open("output_files/eval_matrix_benchmark.txt", 'a') as f:
-                        f.write(write_val)
-                else:
-                    with open("output_files/eval_matrix_benchmark_gaussian.txt", 'a') as f:
-                        f.write(write_val)
+            eval_str_list.append(write_val)
+
         if args.eigv_gen:
             write_val = str(env_obj.max_EA) + ' ' + str(env_obj.rel_reward) + ' ' \
                         + str(env_obj.stable_res) + '\n'
-            if args.out is not None:
-                with open('output_files/{}_eigv_generalization.txt'.format(args.out), 'a') as f:
-                    f.write(write_val)
-            else:
-                if not args.gaussian_actions:
-                    with open('output_files/eigv_generalization.txt', 'a') as f:
-                        f.write(write_val)
-                else:
-                    with open('output_files/eigv_generalization_gaussian.txt', 'a') as f:
-                        f.write(write_val)
+            eigv_str_list.append(write_val)
         if args.opnorm_error:
             if args.eigv_gen:
                 write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' \
@@ -207,21 +198,55 @@ def run(args, parser, env_params):
             if args.eval_matrix:
                 write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' \
                             + str(env_obj.epsilon_B) + '\n'
-            if args.out is not None:
-                with open('output_files/{}_opnorm_error.txt'.format(args.out), 'a') as f:
-                    f.write(write_val)
-            else:
-                if not args.gaussian_actions:
-                    with open('output_files/opnorm_error.txt', 'a') as f:
-                        f.write(write_val)
-                else:
-                    with open('output_files/opnorm_error_gaussian.txt', 'a') as f:
-                        f.write(write_val)
-        if args.out is not None:
-            rollouts.append(rollout)
+            op_norm_str_list.append(write_val)
 
         print('the average reward was {}'.format(np.mean(rewards)))
-    # graph(args, env_params)
+
+    if args.eval_matrix:
+        if args.out is not None:
+            f_name = "output_files/{}_eval_matrix_benchmark.txt".format(args.out)
+        else:
+            if not args.gaussian_actions:
+                f_name = "output_files/eval_matrix_benchmark.txt"
+            else:
+                f_name = "output_files/eval_matrix_benchmark_gaussian.txt"
+
+        with open(f_name, args.write_mode) as filehandle:
+            for list_item in eval_str_list:
+                filehandle.write(list_item)
+
+    if args.eigv_gen:
+        if args.out is not None:
+            f_name = "output_files/{}_eigv_generalization.txt".format(args.out)
+        else:
+            if not args.gaussian_actions:
+                f_name = "output_files/eigv_generalization.txt"
+            else:
+                f_name = "output_files/eigv_generalization_gaussian.txt"
+        with open(f_name, args.write_mode) as filehandle:
+            for list_item in eigv_str_list:
+                filehandle.write(list_item)
+
+    if args.opnorm_error:
+        if args.eigv_gen:
+            write_val = str(env_obj.max_EA) + ' ' + str(env_obj.epsilon_A) + ' ' \
+                        + str(env_obj.epsilon_B) + '\n'
+        if args.eval_matrix:
+            write_val = str(env_obj.num_exp) + ' ' + str(env_obj.epsilon_A) + ' ' \
+                        + str(env_obj.epsilon_B) + '\n'
+        op_norm_str_list.append(write_val)
+        if args.out is not None:
+            f_name = "output_files/{}_opnorm_error.txt".format(args.out)
+        else:
+            if not args.gaussian_actions:
+                f_name = "output_files/opnorm_error.txt"
+            else:
+                f_name = "output_files/opnorm_error_gaussian.txt"
+        with open(f_name, args.write_mode) as filehandle:
+            for list_item in op_norm_str_list:
+                filehandle.write(list_item)
+
+    graph(args, env_params)
 
 
 def graph(args, env_params):
@@ -388,15 +413,18 @@ if __name__ == "__main__":
         args.eval_matrix = False
         args.opnorm_error = True
         gaussian_actions = False
-        full_ls = False
-        args.out = 'dim3_partial_constrained_gen'
+        full_ls = True
+        # args.out = 'dim3_partial_constrained_gen'
+        args.out = "temp"
         env_params = {"horizon": 120, "exp_length": 6, "reward_threshold": -10, "eigv_low": 0,
-                      "eigv_high": 2, "elem_sample": True, "eval_matrix": args.eval_matrix,
+                      "eigv_high": 13, "elem_sample": True, "eval_matrix": args.eval_matrix,
                       "full_ls": full_ls, "gen_num_exp": args.gen_num_exp,
                       "gaussian_actions": gaussian_actions, "dim": 3, "analytic_optimal_cost": True,
-                      "eval_mode": False}
+                      "eval_mode": True}
         register_env(env_name, lambda env_config: create_env(env_config))
-        args.checkpoint = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-20-2019/dim3_full_ls_1000000cond_fullrank/dim3_full_ls_1000000cond_fullrank/PPO_GenLQREnv-v0_1_2019-08-20_00-34-047js2qpm3/checkpoint_600/checkpoint-600"
+        # args.checkpoint = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        #                                                '../trained_policies/full_constrained_R3/checkpoint-2400'))
+        args.checkpoint = "/Users/eugenevinitsky/Desktop/Research/Data/cdc_lqr_paper/08-21-2019/dim3_full_ls_lowcontrol/dim3_full_ls_lowcontrol/PPO_GenLQREnv-v0_1_2019-08-21_05-33-54bmrot4c6/checkpoint_2400/checkpoint-2400"
         args.high = env_params['eigv_high']
 
         run(args, parser, env_params)

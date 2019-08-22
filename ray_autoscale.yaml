@@ -41,7 +41,7 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    InstanceType: c4.4xlarge
+    InstanceType: m4.10xlarge
     ImageId: ami-0e9354081933c4fd8 # Flow AMI (Ubuntu)
     InstanceMarketOptions:
         MarketType: spot
@@ -50,10 +50,10 @@ head_node:
 #            MaxPrice: "1.0"
 
     # You can provision additional disk space with a conf as follows
-    BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-              VolumeSize: 50
+#    BlockDeviceMappings:
+#        - DeviceName: /dev/sda1
+#          Ebs:
+#              VolumeSize: 50
     # Additional options in the boto docs.
 
 # Provider-specific config for worker nodes, e.g. instance type. By default
@@ -61,7 +61,7 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    InstanceType: c.4xlarge
+    InstanceType: m4.10xlarge
     ImageId: ami-0e9354081933c4fd8 # Flow AMI (Ubuntu)
 
     #Run workers on spot by default. Comment this out to use on-demand.
@@ -70,10 +70,10 @@ worker_nodes:
          # Additional options can be found in the boto docs, e.g.
 #        SpotOptions:
 #            MaxPrice: "1.0"
-    BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-              VolumeSize: 50
+#    BlockDeviceMappings:
+#        - DeviceName: /dev/sda1
+#          Ebs:
+#              VolumeSize: 50
 
     # Additional options in the boto docs.
 
@@ -101,8 +101,7 @@ head_setup_commands:
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands:
-    - conda install python=3.6.8 -y
-
+    - conda install python=3.6.6 -y
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands:
     - ray stop

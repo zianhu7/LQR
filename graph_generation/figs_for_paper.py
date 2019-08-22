@@ -26,7 +26,6 @@ def stability_plot(fname, marker, color):
         if num_iters[k]:
             rollout_len.append(k)
             percent_stable.append(v / num_iters[k])
-
     # fig, ax = plt.subplots()
     plt.plot(rollout_len, np.array(percent_stable) * 100, linestyle='-', marker=marker, color=color)
 
