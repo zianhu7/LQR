@@ -42,7 +42,7 @@ class GenLQREnv(gym.Env):
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
         # self.generate_system()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,))
+        self.action_space = spaces.Box(low=-.8, high=.8, shape=(self.dim,))
         self.action_offset = self.dim * (self.params["exp_length"] + 1) * int(
             self.params["horizon"] / self.params["exp_length"])
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
@@ -319,7 +319,7 @@ class GenLQREnv(gym.Env):
         '''Check that the controllability matrix is full rank'''
         dim = self.dim
         stack = []
-        for i in range(dim - 1):
+        for i in range(dim):
             term = B @ np.linalg.matrix_power(A, i)
             stack.append(term)
         gramian = np.hstack(stack)
@@ -341,6 +341,6 @@ class GenLQREnv(gym.Env):
             return mat
 
         rv = generate()
-        while np.linalg.matrix_rank(rv) != self.dim:
-            rv = generate()
+        # while np.linalg.matrix_rank(rv) != self.dim:
+        #     rv = generate()
         return rv
