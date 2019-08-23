@@ -42,6 +42,8 @@ class RegretLQREnv(gym.Env):
         self.prime()
         K_true = sda_estimate(self.A, self.B, self.Q, self.R)
         self.J_star = LQR_cost(self.A, self.B, K_true, self.Q, self.R, self.cov_w)
+        # set the statr back
+        self._state_cur = np.zeros((self.dim, ))
         return self.construct_obs(self._state_cur, np.zeros(self.dim))
 
     def step(self, action):
@@ -58,9 +60,11 @@ class RegretLQREnv(gym.Env):
         cost =  self._state_cur.dot(self.Q.dot(self._state_cur)) + action.dot(self.R.dot(action))
         # we take the negative of regret so that RL maximizing it decreases the regret. We also add on a constant
         # factor so that RL does not try to cause the rollout to end early
+        self.true_regret = cost - self.J_star
         regret = - (cost - self.J_star) + 1
         self._state_cur = xnext
         done = False
+        import ipdb; ipdb.set_trace()
         if np.linalg.norm(self._state_cur) > self.done_norm_cond:
             done = True
 

@@ -15,9 +15,10 @@ import seaborn as sns
 sns.set_style('ticks')
 
 from envs import RegretLQREnv
+from utils.parsers import RegretLQRParserRLlib
 from matni_compare.python import utils
 from matni_compare.python import examples
-from matni_compare.python.adaptiveinput import AdaptiveInputStrategy
+from matni_compare.python.AdaptiveInput import AdaptiveInputStrategy
 from matni_compare.python.constants import rng, horizon, trials_per_method
 from matni_compare.python.nominal import NominalStrategy
 from matni_compare.python.ofu import OFUStrategy
@@ -144,6 +145,8 @@ config['num_workers'] = 1
 
 # Set up the env
 # figure out a way not to hard code this
+parser = RegretLQRParserRLlib()
+args = parser.parse_args()
 env_params = {"horizon": args.horizon,
                   "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
                   "eval_matrix": args.eval_matrix, "initial_samples": args.initial_samples,
