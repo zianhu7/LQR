@@ -1,23 +1,22 @@
-import gym
-from gym import spaces
-from gym.utils import seeding
-import numpy as np
-from os import path
-from numpy.linalg import inv
 import math
-from scipy.linalg import solve_discrete_are as sda
+
+import gym
+import numpy as np
+import scipy
+from gym import spaces
+from numpy.linalg import inv
+
+from utils.lqr_utils import check_controllability, check_observability, check_stability, LQR_cost, sample_matrix, sda_estimate
 
 
 class GenLQREnv(gym.Env):
     def __init__(self, env_params):  # Normalize Q, R
         '''
-        self.es: (bool)
-            If true randomly sample the elements of A and B with top eigenvalues of
-            self.eigv_high and min of -eigv_low. If false, sample diagonalizable
-            A and B with eigenvalues between eigv_low and eigv_high
+        Parameters
+        =========
         self.dim: (int)
             Dimension of the A and B matrices.
-        self.eval_matric: (np.ndarray)
+        self.eval_matrix: (np.ndarray)
             Hard-coded in matrix used to generate some of the figures
         self.full_ls: (bool)
             Whether to use all the input-output pairs (if true) in LS, or only the last
@@ -30,56 +29,62 @@ class GenLQREnv(gym.Env):
         self.analytic_optimal_cost: (bool)
             If true, we compute the analytic optimal cost for our estimated \hat{K}. If false
             we just unroll the K for exp_length steps
+        self.full_ls: (bool)
+            If true, all the samples from the trials are used in the least squares
+        self.gaussian_actions: (bool)
+            If true, actions are sampled from a Gaussian with mean 0 and covariance cov_w * I where
+            I is the identity matrix
+        self.cov_w: (float)
+            This is the scaling factor on the covariance of the Gaussian noise. The gaussian is
+            N(0, cov_w * I).
+        self.rand_num_exp: (bool)
+            If true, the total number of trials is randomly sampled between Uniform(2 * dim, horizon / exp_length)
+        self.exp_length: (int)
+            How long each trial is. Defaults to 6.
+        self.done_norm_cond: (float)
+            If the norm of the state exceeds this value, the experiment ends
         '''
         self.params = env_params
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.num_exp_bound = int(self.params["horizon"] / self.params["exp_length"])
         self.dim = self.params["dim"]
-        self.es = self.params["elem_sample"]
         self.eval_matrix = self.params["eval_matrix"]
         self.eval_mode = self.params["eval_mode"]
         self.analytic_optimal_cost = self.params["analytic_optimal_cost"]
         self.full_ls = self.params["full_ls"]
         self.gaussian_actions = self.params["gaussian_actions"]
-        # self.generate_system()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,))
-        self.action_offset = self.dim * (self.params["exp_length"] + 1) * int(
-            self.params["horizon"] / self.params["exp_length"])
+        #self.obs_norm = self.params.get("obs_norm", 1.0)  # Value we normalize the observations by
+        self.cov_w = self.params.get("cov_w")
+        self.rand_num_exp = self.params["rand_num_exp"]
+        self.exp_length = self.params["exp_length"]
+        self.done_norm_cond = self.params.get("done_norm_cond")
+
+        # We set the bounds of the box to be sqrt(2/pi) so that the norm matches the norm of sampling from
+        # an actual Gaussian with covariance being the identity matrix.
+        self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
+        self.action_offset = self.dim * (self.exp_length + 1) * int(
+            self.params["horizon"] / self.exp_length)
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
                                             shape=(self.action_offset + (self.params["horizon"] + 1) * self.dim + 2,))
         # Track trajectory
-        self.reward_threshold = self.params["reward_threshold"]
+        self.reward_threshold = -abs(self.params["reward_threshold"])
 
     def generate_system(self):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
         # Make generate_system configurable/randomized
+
+        # TODO(@evinitsky) switch the conditions from observability and controllability to stabilizable/detectable
         self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
         if not self.eval_matrix:
-            if not self.es:
-                self.eigv_bound = math.ceil(np.random.uniform(low=self.eigv_low,
-                                                              high=self.eigv_high))
-                self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
-                                                size=self.dim)
-                self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_bound,
-                                                size=self.dim)
-                A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-                # Ensure PD A, controllable system
-                while not self.check_controllability(A, B):
-                    self.a_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
-                                                    size=self.dim)
-                    self.b_eigv = np.random.uniform(low=self.eigv_low, high=self.eigv_high,
-                                                    size=self.dim)
-                    A, B = self.a_eigv * np.eye(self.dim), self.b_eigv * np.eye(self.dim)
-                P_A, P_B = self.rvs(self.dim), self.rvs(self.dim)
-                self.A, self.B = P_A @ A @ P_A.T, P_B @ B @ P_B.T
-            else:
-                A = self.sample_matrix(self.eigv_high)
-                B = self.sample_matrix(self.eigv_high)
-                while not self.check_controllability(A, B):
-                    A = self.sample_matrix(self.eigv_high)
-                    B = self.sample_matrix(self.eigv_high)
-                self.A, self.B = A, B
+            # If true, we sample the elements randomly with maximal element self.eigv_high
+            A = sample_matrix(self.dim, self.eigv_high)
+            B = sample_matrix(self.dim, self.eigv_high)
+            Q_sqrt = scipy.linalg.sqrtm(self.Q)
+            while not check_controllability(A, B) or not check_observability(A, Q_sqrt):
+                A = sample_matrix(self.dim, self.eigv_high)
+                B = sample_matrix(self.dim, self.eigv_high)
+            self.A, self.B = A, B
         else:
             self.A = np.array([[1.01, 0.01, 0], [0.01, 1.01, 0.01], [0, 0.01, 1.01]])
             self.B = np.eye(self.dim)
@@ -96,11 +101,11 @@ class GenLQREnv(gym.Env):
         '''
         self.timestep += 1
         mean = [0] * self.dim
-        cov = np.eye(self.dim)
+        cov = self.cov_w * np.eye(self.dim)
         noise = np.random.multivariate_normal(mean, cov)
         if self.gaussian_actions:
             a = np.random.multivariate_normal(mean, cov)
-        if not self.gaussian_actions:
+        else:
             a = action
         curr_state = self.states[self.curr_exp][-1]
         new_state = self.A @ curr_state + self.B @ a + noise
@@ -109,12 +114,18 @@ class GenLQREnv(gym.Env):
         self.states[self.curr_exp].append(list(new_state))
         self.inputs[self.curr_exp].append(a)
         completion = False
+        if np.linalg.norm(new_state) > self.done_norm_cond:
+            completion = True
         if self.horizon == self.timestep:
             completion = True
         if (self.timestep % self.exp_length == 0) and (not completion):
             self.reset_exp()
-        if completion:
+        # we got to the end of the horizon, compute the error on your estimates
+        if completion and self.horizon == self.timestep:
             reward = self.calculate_reward()
+        # we didn't get to the end, so we are penalized
+        elif completion and self.horizon != self.timestep:
+            reward = self.reward_threshold
         else:
             reward = 0
         return self.state, reward, completion, {}
@@ -149,12 +160,10 @@ class GenLQREnv(gym.Env):
         '''Reset the A and B matrices, reset the state matrix'''
         self.timestep = 0
         self.curr_exp = 0
-        # MODIFICATION, change back (only for eigv generalization replay experiment)
-        if not self.params["gen_num_exp"]:
+        if self.rand_num_exp:
             self.num_exp = int(np.random.uniform(low=2 * self.dim, high=self.num_exp_bound))
-        if self.params["gen_num_exp"]:
-            self.num_exp = self.params["gen_num_exp"]
-        self.exp_length = int(self.params["exp_length"])
+        else:
+            self.num_exp = self.num_exp_bound
         self.horizon = self.num_exp * self.exp_length
         self.states, self.inputs = [[] for i in range(self.num_exp)], [[] for i in range(self.num_exp)]
         self.create_state()
@@ -169,32 +178,13 @@ class GenLQREnv(gym.Env):
         return self.state
 
     ###############################################################################################
-
-    # Generate random orthornormal matrix of given dim
-    def rvs(self, dim):
-        random_state = np.random
-        H = np.eye(dim)
-        D = np.ones((dim,))
-        for n in range(1, dim):
-            x = random_state.normal(size=(dim - n + 1,))
-            D[n - 1] = np.sign(x[0])
-            x[0] -= D[n - 1] * np.sqrt((x * x).sum())  # Householder transformation
-            Hx = (np.eye(dim - n + 1) - 2. * np.outer(x, x) / (x * x).sum())
-            mat = np.eye(dim)
-            mat[n - 1:, n - 1:] = Hx
-            H = np.dot(H, mat)
-            # Fix the last sign such that the determinant is 1
-        D[-1] = (-1) ** (1 - (dim % 2)) * D.prod()
-        # Equivalent to np.dot(np.diag(D), H) but faster, apparently
-        H = (D * H.T).T
-        return H
+    #                                   UTILITY FUNCTIONS
+    ###############################################################################################
 
     def ls_estimate(self):
-        '''Compute an LS estimate of the A and B matrices'''
+        """Compute an LS estimate of the A and B matrices"""
 
         # NOTE: 2*self.dim is baked into the assumption that A,B are square of shape (self.dim, self.dim)
-        # if num_exp == 3 and exp_length == 3:
-        # import ipdb;ipdb.set_trace()
         if self.full_ls:
             X, Z = np.zeros((self.horizon, self.dim)), np.zeros((self.horizon, 2 * self.dim))
             for i in range(self.num_exp):
@@ -222,56 +212,27 @@ class GenLQREnv(gym.Env):
         A, B = theta[:, :self.dim].reshape((self.dim, -1)), theta[:, self.dim:].reshape((self.dim, -1))
         return A, B
 
-    def sda_estimate(self, A, B):
-        '''Solve the discrete algebraic ricatti equation to compute the optimal feedback'''
-        Q, R = self.Q, self.R
-        X = sda(A, B, Q, R)
-        K = np.linalg.inv(R + B.T @ X @ B) @ B.T @ X @ A
-        return X, -K
-
-    def estimate_K(self, horizon, A, B):
-        '''Solve for K recursively. Not used.'''
-        Q, R = self.Q, self.R
-        # Calculate P matrices first for each step
-        P_matrices = np.zeros((horizon + 1, Q.shape[0], Q.shape[1]))
-        P_matrices[horizon] = Q
-        for i in range(horizon - 1, 0, -1):
-            P_t = P_matrices[i + 1]
-            P_matrices[i] = Q + (A.T @ P_t @ A) - (A.T @ P_t @ B @ np.matmul(inv(R + B.T @ P_t @ B), B.T @ P_t @ A))
-        # Hardcoded shape of K, change to inferred shape for diverse testing
-        K_matrices = np.zeros((horizon, self.dim, self.dim))
-        for i in range(horizon):
-            P_i = P_matrices[i + 1]
-            K_matrices[i] = -np.matmul(inv(R + B.T @ P_i @ B), B.T @ P_i @ A)
-        return K_matrices
-
     def calculate_reward(self):
         '''Return the difference between J and J*'''
         # Assumes termination Q is same as regular Q
         Q, R, A, B = self.Q, self.R, self.A, self.B
-        A_est, B_est = self.ls_estimate()
+        self.A_est, self.B_est = self.ls_estimate()
         try:
-            P_ss_hat, K_hat = self.sda_estimate(A_est, B_est)
+            K_hat = sda_estimate(self.A_est, self.B_est, Q, R)
         except:
             with open("err.txt", "a") as f:
                 f.write("e" + '\n')
             return self.reward_threshold
-        P_ss_true, K_true = self.sda_estimate(self.A, self.B)
+        K_true = sda_estimate(self.A, self.B, Q, R)
         r_true, r_hat = 0, 0
-        # Evolve trajectory based on computing input using both K
-        # synth_traj, true_traj = [[],[]], [[],[]]
-        # for i in range(self.num_exp):
-        # state_true, state_hat = self.states[i][0], self.states[i][0]
-        # true_traj[0].append(state_true); synth_traj[0].append(state_hat)
         x0 = np.random.multivariate_normal([0] * self.dim, np.eye(self.dim))
         state_true = x0
         state_hat = np.copy(x0)
         if self.analytic_optimal_cost:
-            is_stable = not self.check_stability(K_hat)
+            is_stable = not check_stability(self.A, self.B, K_hat)
             if is_stable:
-                cov = np.eye(self.dim)
-                r_hat = np.trace(cov @ P_ss_hat)
-                r_true = np.trace(cov @ P_ss_true)
+                r_hat = LQR_cost(A, B, K_hat, Q, R, self.cov_w)
+                r_true = LQR_cost(A, B, K_true, Q, R, self.cov_w)
             # if we aren't stable under the true dynamics we go off to roughly infinity
             else:
                 r_hat = 1e6
@@ -297,40 +258,9 @@ class GenLQREnv(gym.Env):
             self.reward = max(self.reward_threshold, reward)
         else:
             self.reward = reward
-        self.inv_reward = -reward
-        self.stable_res = not self.check_stability(K_hat)
-        _, e_A, _ = np.linalg.svd(A - A_est)
-        _, e_B, _ = np.linalg.svd(B - B_est)
+        self.stable_res = not check_stability(self.A, self.B, K_hat)
+        _, e_A, _ = np.linalg.svd(A - self.A_est)
+        _, e_B, _ = np.linalg.svd(B - self.B_est)
         self.epsilon_A = max([abs(e) for e in e_A])
         self.epsilon_B = max([abs(e) for e in e_B])
         return self.reward
-
-    def check_controllability(self, A, B):
-        '''Check that the controllability matrix is full rank'''
-        dim = self.dim
-        stack = []
-        for i in range(dim - 1):
-            term = B @ np.linalg.matrix_power(A, i)
-            stack.append(term)
-        gramian = np.hstack(stack)
-        return np.linalg.matrix_rank(gramian) == dim
-
-    def check_stability(self, control):
-        '''Confirm that the feedback matrix stabilizes the system'''
-        mat = self.A + self.B @ control
-        return np.any([abs(e) > 1 for e in np.linalg.eigvals(mat)])
-
-    def sample_matrix(self, bound):
-        '''Return a random matrix'''
-
-        def generate():
-            mat = np.eye(self.dim)
-            for i in range(self.dim):
-                elems = np.random.uniform(low=-bound, high=bound, size=self.dim)
-                mat[i] = elems
-            return mat
-
-        rv = generate()
-        while np.linalg.matrix_rank(rv) != self.dim:
-            rv = generate()
-        return rv
