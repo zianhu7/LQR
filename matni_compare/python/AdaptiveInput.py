@@ -3,12 +3,14 @@
 """
 
 """nominal.py
-
 """
+import collections
 import logging
 import math
 
 import numpy as np
+from ray.rllib.env.base_env import _DUMMY_AGENT_ID
+from ray.rllib.policy.sample_batch import DEFAULT_POLICY_ID
 
 from matni_compare.python.adaptive import AdaptiveMethod
 import matni_compare.python.utils as utils
@@ -16,7 +18,6 @@ import matni_compare.python.utils as utils
 
 class AdaptiveInputStrategy(AdaptiveMethod):
     """Adaptive control based on nominal estimates of the dynamics
-
     """
 
     def __init__(self,
@@ -30,10 +31,8 @@ class AdaptiveInputStrategy(AdaptiveMethod):
                  reg,
                  epoch_multiplier,
                  agent,
-                 env_params,
                  epoch_schedule='linear',):
         """
-
         :param Q:
         :param R:
         :param A_star:
@@ -55,6 +54,19 @@ class AdaptiveInputStrategy(AdaptiveMethod):
         self._epoch_schedule = epoch_schedule
         self._logger = logging.getLogger(__name__)
 
+        # use these to track the lstm state
+        # what should these be initialized to?
+        policy_map = agent.workers.local_worker().policy_map
+        state_init = {p: m.get_initial_state() for p, m in policy_map.items()}
+        action_init = {
+            p: m.action_space.sample()
+            for p, m in policy_map.items()
+        }
+        self.agent_states = {}
+        self.prev_actions = {}
+        self.agent_states[DEFAULT_POLICY_ID] = state_init[DEFAULT_POLICY_ID]
+        self.prev_actions[DEFAULT_POLICY_ID] = action_init[DEFAULT_POLICY_ID]
+
         self.agent = agent
 
     def _get_logger(self):
@@ -62,7 +74,6 @@ class AdaptiveInputStrategy(AdaptiveMethod):
 
     def reset(self, rng):
         super().reset(rng)
-        self.last_action = np.zeros(3)  #todo(@evinitsky) remove hardcoding
         self._explore_stddev_history = []
 
     def _on_iteration_completion(self):
@@ -97,7 +108,6 @@ class AdaptiveInputStrategy(AdaptiveMethod):
             return self._epoch_multiplier * math.pow(2, self._epoch_idx)
 
     def _explore_stddev(self):
-        # TODO(@evinitsky) explore an exponential decay cycle!!!!!
         if self._epoch_schedule == 'linear':
             sigma_explore_decay = 1/math.pow(self._epoch_idx + 1, 1/3)
             return self._sigma_explore * sigma_explore_decay
@@ -113,10 +123,16 @@ class AdaptiveInputStrategy(AdaptiveMethod):
 
     # We use the nominal controller but with the exploratory action selected from our policy
     def _get_input(self, state, rng):
-        # TODO(@evinitsky) THIS MODEL IS RECURRENT! You need to treat it like it's recurrent
-        obs = np.concatenate((self.A_nom.reshape(-1), self.B_nom.reshape(-1), self.cov.reshape(-1), state, self.last_action))
-        final_action = self.agent.compute_action(obs)
+        obs = np.concatenate((self.Anom.reshape(-1), self.Bnom.reshape(-1), self.cov.reshape(-1),
+                              state, self.prev_actions[DEFAULT_POLICY_ID]))
+        a_action, p_state, _ = self.agent.compute_action(
+                            obs,
+                            state=self.agent_states[DEFAULT_POLICY_ID],
+                            prev_action=self.prev_actions[DEFAULT_POLICY_ID],
+                            policy_id=DEFAULT_POLICY_ID)
+        self.agent_states[DEFAULT_POLICY_ID] = p_state
+        self.prev_actions[DEFAULT_POLICY_ID] = a_action
+        print(a_action)
+        print(state)
 
-        self.last_action = final_action
-
-        return final_action
+        return a_action

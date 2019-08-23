@@ -26,16 +26,18 @@ class RegretLQREnv(gym.Env):
         self.dynamics_w = self.params.get("dynamics_w")  # the std-dev of the dynamics gaussian
         self.done_norm_cond = self.params.get("done_norm_cond")  # if the state norm exceeds this value, the rollout ends
         self.action_space = spaces.Box(low=-np.sqrt(2 / np.pi), high=np.sqrt(2 / np.pi), shape=(self.dim,))
-        # State is state, action, unrolled A_nom matrix, unrolled B_nom matrix, cov matrix
+        # State is state, action, unrolled A_nom matrix, unrolled B_nom matrix, cov matrix, 1 for the index
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,
-                                            shape=(2 * self.dim + 2 * (self.dim ** 2) + ((2 * self.dim) ** 2),))
+                                            shape=(2 * self.dim + 2 * (self.dim ** 2) + ((2 * self.dim) ** 2 + 1),))
         self.state_buffer = []
         self.next_state_buffer = []
         self.action_buffer = []
         self._state_cur = np.zeros((self.dim, ))
+        self.index = 0
 
     def reset(self):
         """Initialize the buffer with some sample states"""
+        self.index = 0
         self.generate_system()
         self._state_cur = np.zeros((self.dim, ))
         self.prime_excitation = np.random.uniform(low=self.prime_excitation_low, high=self.prime_excitation_high)
@@ -61,17 +63,21 @@ class RegretLQREnv(gym.Env):
         # we take the negative of regret so that RL maximizing it decreases the regret. We also add on a constant
         # factor so that RL does not try to cause the rollout to end early
         self.true_regret = cost - self.J_star
+        print('the cost is {}'.format(cost))
+        print('j star is {}'.format(self.J_star))
         regret = - (cost - self.J_star) + 1
         self._state_cur = xnext
         done = False
-        import ipdb; ipdb.set_trace()
         if np.linalg.norm(self._state_cur) > self.done_norm_cond:
             done = True
+        self.index += 1
 
         return self.construct_obs(self._state_cur, action) / self.obs_norm, regret, done, {}
 
     def construct_obs(self, state, input):
-        return np.concatenate((self.A_hat.reshape(-1), self.B_hat.reshape(-1), self.cov.reshape(-1), state, input))
+        # TODO(@evinitsky) most of these elements should never change!!!
+        return np.concatenate((self.A_hat.reshape(-1), self.B_hat.reshape(-1), self.cov.reshape(-1), state, input,
+                               self.index))
 
     def update_dynamics(self, input):
         return self.A.dot(self._state_cur) + self.B.dot(input) + self.dynamics_w * np.random.normal(size=(self.dim))

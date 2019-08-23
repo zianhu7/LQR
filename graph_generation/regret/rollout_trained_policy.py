@@ -102,7 +102,6 @@ while not done and steps < args.horizon:
                 agent_id, policy_agent_mapping(agent_id))
             p_use_lstm = use_lstm[policy_id]
             if p_use_lstm:
-                import ipdb; ipdb.set_trace()
                 a_action, p_state, _ = agent.compute_action(
                     a_obs,
                     state=agent_states[agent_id],
@@ -131,9 +130,9 @@ while not done and steps < args.horizon:
 
     if multiagent:
         done = done["__all__"]
-        reward_total += sum(reward.values())
+        reward_total += sum(env.true_regret.values())
     else:
-        reward_total += reward
+        reward_total += env.true_regret
     steps += 1
     obs = next_obs
 print("Episode reward", reward_total)

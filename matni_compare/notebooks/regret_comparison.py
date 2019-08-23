@@ -145,15 +145,13 @@ config['num_workers'] = 1
 
 # Set up the env
 # figure out a way not to hard code this
-parser = RegretLQRParserRLlib()
-args = parser.parse_args()
-env_params = {"horizon": args.horizon,
-                  "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
-                  "eval_matrix": args.eval_matrix, "initial_samples": args.initial_samples,
-                  "dim": args.dim, "prime_excitation_low": args.prime_excitation_low,
-                  "prime_excitation_high": args.prime_excitation_high, "cov_w": args.cov_w,
-                  "gaussian_actions": args.gaussian_actions, "dynamics_w": args.dynamics_w,
-                  "obs_norm": args.obs_norm}
+env_params = {"horizon": horizon,
+              "eigv_low": 0, "eigv_high": 10,
+              "eval_matrix": 0, "initial_samples": 1,
+              "dim": A_star.shape[0], "prime_excitation_low": 0.5,
+              "prime_excitation_high": 2.0, "cov_w": 1.0,
+              "gaussian_actions": 0, "dynamics_w": 1.0,
+              "obs_norm": 1.0, "done_norm_cond": 1000}
 cls = get_agent_class('PPO')
 config["env_config"] = env_params
 agent = cls(env=RegretLQREnv, config=config)
@@ -171,9 +169,7 @@ def adaptive_input_actor():
                           epoch_multiplier=10,
                           rls_lam=None,
                           agent=agent,
-                          env_params=env_params,
-                                 epoch_schedule='linear')
-
+                          epoch_schedule='linear')
 # # Helper methods for running in parallel
 
 prime_seed = 45727
