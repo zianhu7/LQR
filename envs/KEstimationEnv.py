@@ -38,7 +38,7 @@ class KEstimationEnv(gym.Env):
         self.es = self.params["elem_sample"]
         self.stability_scaling = self.params["stability_scaling"]
         # self.generate_system()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,self.dim))
+        self.action_space = spaces.Box(low=-1, high=1, shape=(int(math.pow(self.dim, 2)),))
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
                                             shape=(self.dim * (self.horizon + 1),))
@@ -71,6 +71,7 @@ class KEstimationEnv(gym.Env):
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean, cov)
         curr_state = self.state[-self.dim:]
+        action = np.reshape(action, (self.dim, self.dim))
         a = action @ curr_state
         a /= np.linalg.norm(a) + 1e-5
         new_state = self.A @ curr_state + self.B @ a + noise
@@ -83,7 +84,7 @@ class KEstimationEnv(gym.Env):
             stable = not self.check_stability(action)
             s_reward = self.stability_scaling if stable else -self.stability_scaling
             reward += s_reward
-        return self.state, reward, completion, {}
+        return self.state, max(reward, self.reward_threshold), completion, {}
 
     def update_state(self, new_state):
         '''Keep internal track of the state for plotting purposes'''
@@ -121,7 +122,7 @@ class KEstimationEnv(gym.Env):
         '''Check that the controllability matrix is full rank'''
         dim = self.dim
         stack = []
-        for i in range(dim - 1):
+        for i in range(dim):
             term = B @ np.linalg.matrix_power(A, i)
             stack.append(term)
         gramian = np.hstack(stack)
