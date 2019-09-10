@@ -36,7 +36,6 @@ class KEstimationEnv(gym.Env):
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
-        self.eval_mode = self.params["eval_mode"]
         self.stability_scaling = self.params["stability_scaling"]
         # self.generate_system()
         self.action_space = spaces.Box(low=-1, high=1, shape=(self.dim,self.dim))
@@ -73,6 +72,7 @@ class KEstimationEnv(gym.Env):
         noise = np.random.multivariate_normal(mean, cov)
         curr_state = self.state[-self.dim:]
         a = action @ curr_state
+        a /= np.linalg.norm(a) + 1e-5
         new_state = self.A @ curr_state + self.B @ a + noise
         self.update_state(new_state)
         reward = - new_state.T @ self.Q @ new_state - a.T @ self.R @ a
