@@ -26,10 +26,10 @@ def create_env(env_config):
 
 if __name__ == '__main__':
     #horizon, exp_length upper bounds
-    env_params = {"horizon": 120, "exp_length":6, "reward_threshold":-10,
+    env_params = {"horizon": 120, "reward_threshold": -10,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "eval_matrix": False, "full_ls": True,
-                  "dim": 1, "eval_mode": False, "analytic_optimal_cost": False}
+                  "elem_sample": True,
+                  "dim": 1}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = 38
     ray.init(redis_address="localhost:6379")
