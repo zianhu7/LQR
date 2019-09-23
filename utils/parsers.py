@@ -79,6 +79,27 @@ def genlqr_env_args(parser):
     parser.add_argument("--done_norm_cond", type=float, default=20.0, help="If the norm of the state exceeds this value,"
                                                                            "the rollout will end")
 
+def kestimation_env_args(parser):
+    # ================================================================================================
+    #                    GEN LQR ENV PARAMS
+    # ================================================================================================
+    parser.add_argument("--horizon", type=int, default=120, help="Maximum number of total steps for an identification "
+                                                                 "experiment.")
+    parser.add_argument("--exp_length", type=int, default=6, help="The total length of an identification trial")
+    parser.add_argument("--reward_threshold", type=float, default=10, help="Below this value the total reward is "
+                                                                           "clipped to prevent gradient explosion")
+    parser.add_argument("--eigv_low", type=float, default=0.5, help="Minimum absolute value of eigenvalue A can have. "
+                                                                    "If A has an eigenvalue below this, we "
+                                                                    "sample a new A.")
+    parser.add_argument("--eigv_high", type=float, default=2.0, help="Maximum absolute value of eigenvalue A can have. "
+                                                                     "If A has an eigenvalue above this, we "
+                                                                     "sample a new A.")
+    parser.add_argument("--dim", type=int, default=3, help="Dim of A and B matrices")
+    parser.add_argument("--elem_sample", type=bool, default=True, help="Sampling method of A,B")
+    parser.add_argument("--stability_scaling", type=float, default=20, help="Additive final reward for stable controller.")
+
+
+
 def add_rllib_args(parser):
     parser.add_argument("exp_title", type=str, help="Name of experiment. The results will be saved to a folder"
                                                     "with this name")
@@ -111,6 +132,11 @@ def GenLQRParserRLlib():
     add_rllib_args(parser)
     return parser
 
+def KEstimationParserRLlib():
+    parser = argparse.ArgumentParser()
+    kestimation_env_args(parser)
+    add_rllib_args(parser)
+    return parser
 
 def RegretLQRParserRLlib():
     parser = argparse.ArgumentParser()
