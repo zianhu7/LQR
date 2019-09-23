@@ -16,7 +16,7 @@ develop`. This method is not as extensively tested as the conda install.
 In the spirit of reproducibility, we've uploaded all of the trained models to this repository.
 To run one of the trained models examine `graph_generation/graph_rollouts.py`.
 To generate all the graphs for the paper, run
-`python graph_generation/figs_for_paper`
+`python graph_generation/figs_for_paper.py`
 
 ## Understanding the codebase
 The main file is GenLQREnv.py which contains the environment used for training.
@@ -27,13 +27,10 @@ generate a feedback matrix that is used to rollout for horizon steps and compute
 The  main parameters used to control it are the dimension and the following environment
 configs that can be set in `gen_script.py`
 - 'dim': Dimension of the square A and B matrices. dim=3 -> 3x3 matrices.
-- 'elem_sample': if true all the elements of A and B are randomly sampled, if false eigenvalues
-are sampled and then rotation matrices are applied.
 - 'eval_matrix': this references the Q and R matrices that were taken from "On The Sample Complexity
-    Of The Linear Quadratic Regulator"
-- 'eigv_high': If 'elem_sample' is true the eigenvalues are bounded between -eigv_high and eigv_high.
-    If 'elem_sample' is false this is the maximum eigenvalue of the sampled matrices.
-- 'eigv_low': If 'elem_sample' is false, this is the minimal eigenvalue of the sampled matrices.
+    Of The Linear Quadratic Regulator". 
+- 'eigv_high': The eigenvalues are bounded between -eigv_high * dim and eigv_high * dim.
+- 'eigv_low': This is the minimal eigenvalue of the sampled matrices.
 - 'reward_threshold': If the reward goes below reward_threshold, the reward is clipped at that value.
 - 'full_ls': If this is true all of the input, output samples are used in the least squares estimation.
 If it is false, only the last input-output pair of each rollout is used.

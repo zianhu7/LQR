@@ -5,13 +5,13 @@ cluster_name: eugene_test #<YOUR NAME>
 
 # The minimum number of workers nodes to launch in addition to the head
 # node. This number should be >= 0.
-min_workers: 9 #<NUM WORKERS IN CLUSTER>
+min_workers: 3 #<NUM WORKERS IN CLUSTER>
 
 # The maximum number of workers nodes to launch in addition to the head
 # node. This takes precedence over min_workers.
-max_workers: 9
+max_workers: 3
 
-initial_workers: 9
+initial_workers: 0
 
 # The autoscaler will scale up the cluster to this target fraction of resource
 # usage. For example, if a cluster of 10 nodes is 100% busy and
@@ -50,10 +50,10 @@ head_node:
 #            MaxPrice: "1.0"
 
     # You can provision additional disk space with a conf as follows
-    BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-              VolumeSize: 50
+#    BlockDeviceMappings:
+#        - DeviceName: /dev/sda1
+#          Ebs:
+#              VolumeSize: 50
     # Additional options in the boto docs.
 
 # Provider-specific config for worker nodes, e.g. instance type. By default
@@ -70,10 +70,10 @@ worker_nodes:
          # Additional options can be found in the boto docs, e.g.
 #        SpotOptions:
 #            MaxPrice: "1.0"
-    BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-              VolumeSize: 50
+#    BlockDeviceMappings:
+#        - DeviceName: /dev/sda1
+#          Ebs:
+#              VolumeSize: 50
 
     # Additional options in the boto docs.
 
@@ -84,8 +84,9 @@ file_mounts: {
 
 setup_commands:
     # checkout your desired branch on all worker nodes
+    - pip install ray==0.7.2
     - echo 'export PATH="/home/ubuntu/anaconda3/bin:$PATH"' >> ~/.bashrc
-    - cd LQR && git fetch && git pull origin master
+    - cd LQR && git fetch && git checkout -f evinitsky/cleanup #pull origin master
     # - cd LQR/cpremote_run && pip install -r requirements.txt
     # - cd LQR && conda env create -f environment.yml
     # - source activate lqr
@@ -100,7 +101,7 @@ head_setup_commands:
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands:
-    - conda install python=3.6.8 -y
+    - conda install python=3.6.6 -y
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands:
