@@ -33,6 +33,7 @@ class KEstimationEnv(gym.Env):
         '''
         self.params = env_params
         self.horizon = self.params["horizon"]
+        self.exp_length = self.params["exp_length"]
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
@@ -49,7 +50,7 @@ class KEstimationEnv(gym.Env):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
         # Make generate_system configurable/randomized
         #TODO: What to make Q, R?
-        self.Q, self.R = 0.001 * np.eye(self.dim), np.eye(self.dim)
+        self.Q, self.R = np.eye(self.dim), np.eye(self.dim)
         A = self.sample_matrix(self.eigv_high)
         B = np.eye(self.dim)
         while not self.check_controllability(A, B):
@@ -66,25 +67,35 @@ class KEstimationEnv(gym.Env):
         reward: J* - J (distance to optimal reward)
         completion: True is horizon number of steps is taken. If hit, we call reset_exp
         '''
+        curr_state = self.state[self.timestep * self.dim: (self.timestep + 1) * self.dim]
         self.timestep += 1
         mean = [0] * self.dim
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean, cov)
-        curr_state = self.state[-self.dim:]
         action = np.reshape(action, (self.dim, self.dim))
         a = action @ curr_state
-        a /= np.linalg.norm(a) + 1e-5
+        action_norm = np.linalg.norm(a)
+        if action_norm > 1:
+            a /= (np.linalg.norm(a) + 1e-5)
         new_state = self.A @ curr_state + self.B @ a + noise
         self.update_state(new_state)
         reward = - new_state.T @ self.Q @ new_state - a.T @ self.R @ a
         completion = False
         if self.horizon == self.timestep:
             completion = True
+        if (self.timestep % self.exp_length == 0) and (not completion):
+            self.reset_exp()
         if completion:
             stable = not self.check_stability(action)
             s_reward = self.stability_scaling if stable else -self.stability_scaling
             reward += s_reward
         return self.state, max(reward, self.reward_threshold), completion, {}
+
+    def reset_exp(self):
+        '''Restarts the rollout process for a given experiment'''
+        # Not global reset, only for each experiment
+        new_state = np.zeros(self.dim)
+        self.update_state(new_state)
 
     def update_state(self, new_state):
         '''Keep internal track of the state for plotting purposes'''
