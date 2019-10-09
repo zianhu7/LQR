@@ -2,7 +2,7 @@
 
 # This script is used to spin up and run the rllib experiments
 
-ray exec ../../../ray_autoscale.yaml "python LQR/run_scripts/rllib/KEstimation/k_scripty.py dim1_stability_additive --dim 1 \
+ray exec ../../../ray_autoscale.yaml "python LQR/run_scripts/rllib/KEstimation/k_script.py dim1_stability_additive --dim 1 \
     --num_cpus 36 --use_s3 1 --checkpoint_freq 100 --num_iters 2500 --multi_node 1 --grid_search 1 --num_samples 2\
     --eigv_high 2.0 --eigv_low 0.5 --stability_scaling 30 --elem_sample 1 --horizon 120 --exp_length 6" \
     --start --stop --cluster-name 100_fls --tmux

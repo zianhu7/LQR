@@ -45,6 +45,7 @@ class KEstimationEnv(gym.Env):
                                             shape=(self.dim * (self.horizon + 1),))
         # Track trajectory
         self.reward_threshold = self.params["reward_threshold"]
+        self.stability_history = []
 
     def generate_system(self):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
@@ -79,17 +80,19 @@ class KEstimationEnv(gym.Env):
             a /= (np.linalg.norm(a) + 1e-5)
         new_state = self.A @ curr_state + self.B @ a + noise
         self.update_state(new_state)
-        reward = - new_state.T @ self.Q @ new_state - a.T @ self.R @ a
+        reward = 0
         completion = False
         if self.horizon == self.timestep:
             completion = True
         if (self.timestep % self.exp_length == 0) and (not completion):
+            stable = not self.check_stability(action)
+            reward = self.stability_scaling if stable else -self.stability_scaling
+            self.stability_history += [1] if stable else [0]
             self.reset_exp()
         if completion:
             stable = not self.check_stability(action)
-            s_reward = self.stability_scaling if stable else -self.stability_scaling
-            reward += s_reward
-        return self.state, max(reward, self.reward_threshold), completion, {}
+            reward = self.stability_scaling if stable else -self.stability_scaling
+        return self.state, reward, completion, {}
 
     def reset_exp(self):
         '''Restarts the rollout process for a given experiment'''
@@ -124,6 +127,7 @@ class KEstimationEnv(gym.Env):
         e_B, _ = np.linalg.eig(self.B)
         self.max_EA = max([abs(e) for e in e_A])
         self.max_EB = max([abs(e) for e in e_B])
+        self.stability_history = []
         return self.state
 
     ###############################################################################################

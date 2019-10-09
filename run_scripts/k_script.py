@@ -26,13 +26,13 @@ def create_env(env_config):
 
 if __name__ == '__main__':
     #horizon, exp_length upper bounds
-    env_params = {"horizon": 60, "reward_threshold": -10, "exp_length": 6,
+    env_params = {"horizon": 120, "reward_threshold": -10, "exp_length": 6,
                   "eigv_low": 0.5, "eigv_high": 2,
-                  "elem_sample": True, "stability_scaling": 20,
+                  "elem_sample": True, "stability_scaling": 10,
                   "dim": 1}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 3
-    ray.init(redirect_output=False)
+    num_cpus = 1
+    ray.init()
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000
     config["num_sgd_iter"]=10
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     config["horizon"] = env_params["horizon"]
     config["use_gae"] = True
     config["lambda"] = 0.1
-    config["lr"] = grid_search([5e-4, 1e-4, 1e-3, 5e-3])
+    config["lr"] = grid_search([1e-4])
     config["sgd_minibatch_size"] = 64
     config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
 
