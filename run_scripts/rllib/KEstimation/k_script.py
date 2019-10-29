@@ -3,11 +3,12 @@ import json
 
 import gym
 from gym.envs.registration import register
+import pytz
 
 import ray
 import ray.rllib.agents.ppo.ppo as ppo
 from ray.tune.registry import register_env
-from ray.tune import run_experiments, grid_search
+from ray.tune import run, grid_search
 
 from utils.parsers import KEstimationParserRLlib
 
@@ -61,9 +62,11 @@ if __name__ == '__main__':
     # save the env params for later replay
     flow_json = json.dumps(env_params, sort_keys=True, indent=4)
     config['env_config']['env_params'] = flow_json
+    date=datetime.now(tz=pytz.utc)
+    date = date.astimezone(pytz.timezone('US/Pacific')).strftime("%m-%d-%Y")
 
-    s3_string = "s3://eugene.experiments/k_estimation/" \
-                + datetime.now().strftime("%m-%d-%Y") + '/' + args.exp_title
+    s3_string = "s3://ethan.experiments/k_estimation/" \
+                + date + '/' + args.exp_title
     config['env'] = env_name
     exp_dict = {
         'name': args.exp_title,
