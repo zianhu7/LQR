@@ -84,7 +84,7 @@ def create_env(env_config):
 def run(args, parser, env_params):
     #config_dir = os.path.dirname(args.checkpoint)
     #config_path = os.path.join(config_dir, "params.pkl")
-    config_path = "/Users/zian.hu/ray_results/KEstimation_R1/PPO_KEstimationEnv-v0_1_lr=0.0001_2019-09-23_18-14-21b8i_fefj/params.pkl"
+    config_path = "/home/zian/Desktop/research/LQR/graph_generation/10-28-2019/dim1_stability_additive/dim1_stability_additive/PPO_KEstimationEnv-v0_0_2019-10-29_02-44-41zd5heqqw/checkpoint_2500"
     if not os.path.exists(config_path):
         config_path = os.path.join(config_dir, "../params.pkl")
     if not os.path.exists(config_path):
