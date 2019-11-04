@@ -38,6 +38,7 @@ class KEstimationEnv(gym.Env):
         self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
         self.stability_scaling = self.params["stability_scaling"]
+        self.end_scaling = self.params["end_scaling"]
         # self.generate_system()
         self.action_space = spaces.Box(low=-1, high=1, shape=(int(math.pow(self.dim, 2)),))
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
@@ -86,7 +87,8 @@ class KEstimationEnv(gym.Env):
             completion = True
         if (self.timestep % self.exp_length == 0) and (not completion):
             stable = not self.check_stability(action)
-            reward = self.stability_scaling if stable else -self.stability_scaling
+            if not self.end_scaling:
+                reward = self.stability_scaling if stable else -self.stability_scaling
             self.stability_history += [1] if stable else [0]
             self.reset_exp()
         if completion:

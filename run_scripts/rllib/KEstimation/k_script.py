@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     env_params = {"horizon": args.horizon, "reward_threshold": -abs(args.reward_threshold),
                   "exp_length": args.exp_length, "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
-                  "elem_sample": args.elem_sample, "stability_scaling": args.stability_scaling, "dim": args.dim}
+                  "elem_sample": args.elem_sample, "stability_scaling": args.stability_scaling, "dim": args.dim, "end_scaling": args.end_scaling}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus
     if args.multi_node:

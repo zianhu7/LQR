@@ -97,6 +97,7 @@ def kestimation_env_args(parser):
     parser.add_argument("--dim", type=int, default=3, help="Dim of A and B matrices")
     parser.add_argument("--elem_sample", type=bool, default=True, help="Sampling method of A,B")
     parser.add_argument("--stability_scaling", type=float, default=20, help="Additive final reward for stable controller.")
+    parser.add_argument("--end_scaling", type=bool, default=False, help="whether to only reward at very end of rollout or also at end of every trial.")
 
 
 
