@@ -89,11 +89,13 @@ class KEstimationEnv(gym.Env):
             stable = not self.check_stability(action)
             if not self.end_scaling:
                 reward = self.stability_scaling if stable else -self.stability_scaling
+                reward /= 100
             self.stability_history += [1] if stable else [0]
             self.reset_exp()
         if completion:
             stable = not self.check_stability(action)
             reward = self.stability_scaling if stable else -self.stability_scaling
+            reward /= 100
         return self.state, reward, completion, {}
 
     def reset_exp(self):

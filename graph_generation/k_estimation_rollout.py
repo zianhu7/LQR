@@ -61,7 +61,7 @@ def create_parser(parser_creator=None):
     parser.add_argument(
         "--steps", default=1000, help="Number of steps to roll out.")
     parser.add_argument("--out", default=None, help="Output filename.")
-    parser.add_argument("--high", type=float, nargs='+', default=1,
+    parser.add_argument("--high", type=float, nargs='+', default=2,
                         help="upper bound for eigenvalue initialization")
     parser.add_argument("--elem_sample", type=int, default=1, help="Element sampling")
     parser.add_argument("--stability_scaling", type=int, default=10, help="Stability scaling")
@@ -82,9 +82,8 @@ def create_env(env_config):
 
 
 def run(args, parser, env_params):
-    #config_dir = os.path.dirname(args.checkpoint)
-    #config_path = os.path.join(config_dir, "params.pkl")
-    config_path = "/home/zian/Desktop/research/LQR/graph_generation/10-28-2019/dim1_stability_additive/dim1_stability_additive/PPO_KEstimationEnv-v0_0_2019-10-29_02-44-41zd5heqqw/checkpoint_2500"
+    config_dir = os.path.dirname(args.checkpoint)
+    config_path = os.path.join(config_dir, "params.pkl")
     if not os.path.exists(config_path):
         config_path = os.path.join(config_dir, "../params.pkl")
     if not os.path.exists(config_path):
