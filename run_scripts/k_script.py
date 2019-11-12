@@ -29,9 +29,9 @@ if __name__ == '__main__':
     env_params = {"horizon": 120, "reward_threshold": -10, "exp_length": 6,
                   "eigv_low": 0.5, "eigv_high": 2,
                   "elem_sample": True, "stability_scaling": 10,
-                  "dim": 1}
+                  "dim": 1, "end_scaling": False}
     register_env(env_name, lambda env_config: create_env(env_config))
-    num_cpus = 1
+    num_cpus = 0
     ray.init()
     config = ppo.DEFAULT_CONFIG.copy()
     config["train_batch_size"] = 30000

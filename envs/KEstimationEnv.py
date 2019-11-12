@@ -10,30 +10,10 @@ from scipy.linalg import solve_discrete_are as sda
 
 class KEstimationEnv(gym.Env):
     def __init__(self, env_params):  # Normalize Q, R
-        '''
-        self.es: (bool)
-            If true randomly sample the elements of A and B with top eigenvalues of
-            self.eigv_high and min of -eigv_low. If false, sample diagonalizable
-            A and B with eigenvalues between eigv_low and eigv_high
-        self.dim: (int)
-            Dimension of the A and B matrices.
-        self.eval_matric: (np.ndarray)
-            Hard-coded in matrix used to generate some of the figures
-        self.full_ls: (bool)
-            Whether to use all the input-output pairs (if true) in LS, or only the last
-            input-output pair of each rollout
-        self.gaussian_actions: (bool)
-            If true the actions are simply sampled for a Gaussian with zero mean and identity
-            covariance. If false, the Neural Network is used to generate the actions.
-        self.reward_threshold: (float)
-            The value we clip the reward at.
-        self.analytic_optimal_cost: (bool)
-            If true, we compute the analytic optimal cost for our estimated \hat{K}. If false
-            we just unroll the K for exp_length steps
-        '''
         self.params = env_params
         self.horizon = self.params["horizon"]
         self.exp_length = self.params["exp_length"]
+        self.num_exp = int(self.horizon / self.exp_length)
         self.eigv_low, self.eigv_high = self.params["eigv_low"], self.params["eigv_high"]
         self.dim = self.params["dim"]
         self.es = self.params["elem_sample"]
@@ -42,8 +22,10 @@ class KEstimationEnv(gym.Env):
         # self.generate_system()
         self.action_space = spaces.Box(low=-1, high=1, shape=(int(math.pow(self.dim, 2)),))
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
+        self.action_offset = int(math.pow(self.dim, 2)) * (self.exp_length + 1) * int(
+            self.params["horizon"] / self.exp_length)
         self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
-                                            shape=(self.dim * (self.horizon + 1),))
+                                            shape=(self.action_offset + self.dim * (self.horizon + 1) + 2,))
         # Track trajectory
         self.reward_threshold = self.params["reward_threshold"]
         self.stability_history = []
@@ -81,6 +63,7 @@ class KEstimationEnv(gym.Env):
             a /= (np.linalg.norm(a) + 1e-5)
         new_state = self.A @ curr_state + self.B @ a + noise
         self.update_state(new_state)
+        self.update_action(np.reshape(a, (self.dim * self.dim,)))
         reward = 0
         completion = False
         if self.horizon == self.timestep:
@@ -118,7 +101,9 @@ class KEstimationEnv(gym.Env):
 
     def create_state(self):
         '''Initialize the zero padded state of the system'''
-        self.state = [0 for _ in range(self.dim * (self.horizon + 1))]
+        self.state = [0 for _ in range(self.action_offset +
+                                       (self.params["horizon"] + 1) * self.dim)] + \
+                     [self.exp_length, self.num_exp]
 
     def reset(self):
         '''Reset the A and B matrices, reset the state matrix'''
