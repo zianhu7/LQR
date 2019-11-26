@@ -30,13 +30,20 @@ def create_env(env_config):
     env = gym.envs.make(env_name)
     return env
 
+def on_episode_end(info):
+    env = info['env'].get_unwrapped()[0].env
+    episode = info["episode"]
+    episode.custom_metrics["end_stable"] = env.end_stable
+    episode.custom_metrics["avg_action_magnitude"] = env.avg_action_magnitude
+
 if __name__ == '__main__':
     parser = KEstimationParserRLlib()
     args = parser.parse_args()
 
     env_params = {"horizon": args.horizon, "reward_threshold": -abs(args.reward_threshold),
                   "exp_length": args.exp_length, "eigv_low": args.eigv_low, "eigv_high": args.eigv_high,
-                  "elem_sample": args.elem_sample, "stability_scaling": args.stability_scaling, "dim": args.dim, "end_scaling": args.end_scaling}
+                  "elem_sample": args.elem_sample, "stability_scaling": args.stability_scaling, "dim": args.dim, "end_scaling": args.end_scaling,
+                  "use_lstm": args.use_lstm}
     register_env(env_name, lambda env_config: create_env(env_config))
     num_cpus = args.num_cpus
     if args.multi_node:
@@ -56,8 +63,9 @@ if __name__ == '__main__':
         config["lr"] = grid_search([1e-4, 5e-4, 1e-3, 5e-3, 1e-5, 5e-5])
     else:
         config["lr"] = 1e-3
-    config["sgd_minibatch_size"] = 64
-    config["model"].update({"fcnet_hiddens": [256, 256, 256]}) # number of hidden layers in NN
+        config["sgd_minibatch_size"] = 64
+    config["model"].update({"fcnet_hiddens": [256, 256], "use_lstm": env_params["use_lstm"]}) # number of hidden layers in NN
+    config["callbacks"] = {"on_episode_end": ray.tune.function(on_episode_end)}
 
     # save the env params for later replay
     flow_json = json.dumps(env_params, sort_keys=True, indent=4)
