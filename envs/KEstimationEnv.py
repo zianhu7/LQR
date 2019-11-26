@@ -19,16 +19,21 @@ class KEstimationEnv(gym.Env):
         self.es = self.params["elem_sample"]
         self.stability_scaling = self.params["stability_scaling"]
         self.end_scaling = self.params["end_scaling"]
+        self.use_lstm = self.params["use_lstm"]
         # self.generate_system()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(int(math.pow(self.dim, 2)),))
+        self.action_space = spaces.Box(low=-1.5, high=1.5, shape=(int(math.pow(self.dim, 2)),))
         # 2 at end is for 1. num_exp 2. exp_length param pass-in to NN
         self.action_offset = int(math.pow(self.dim, 2)) * (self.exp_length + 1) * int(
             self.params["horizon"] / self.exp_length)
-        self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
+        if self.use_lstm:
+            self.observation_space = spaces.Box(low=-math.inf, high=math.inf, shape=(self.dim,))
+        else:
+            self.observation_space = spaces.Box(low=-math.inf, high=math.inf,
                                             shape=(self.action_offset + self.dim * (self.horizon + 1) + 2,))
         # Track trajectory
         self.reward_threshold = self.params["reward_threshold"]
         self.stability_history = []
+        self.action_magnitudes = []
 
     def generate_system(self):
         '''Generates the square A and B matrices. Guarantees that A and B form a controllable system'''
@@ -51,17 +56,16 @@ class KEstimationEnv(gym.Env):
         reward: J* - J (distance to optimal reward)
         completion: True is horizon number of steps is taken. If hit, we call reset_exp
         '''
-        curr_state = self.state[self.timestep * self.dim: (self.timestep + 1) * self.dim]
+        curr_state = self.state[self.timestep * self.dim: (self.timestep + 1) * self.dim] if not self.use_lstm else self.state
         self.timestep += 1
         mean = [0] * self.dim
         cov = np.eye(self.dim)
         noise = np.random.multivariate_normal(mean, cov)
         action = np.reshape(action, (self.dim, self.dim))
         a = action @ curr_state
-        action_norm = np.linalg.norm(a)
-        if action_norm > 1:
-            a /= (np.linalg.norm(a) + 1e-5)
+        self.action_magnitudes.append(a)
         new_state = self.A @ curr_state + self.B @ a + noise
+        new_state /= math.pow(self.eigv_high, self.exp_length)
         self.update_state(new_state)
         self.update_action(np.reshape(a, (self.dim * self.dim,)))
         reward = 0
@@ -79,7 +83,9 @@ class KEstimationEnv(gym.Env):
             stable = not self.check_stability(action)
             reward = self.stability_scaling if stable else -self.stability_scaling
             reward /= 100
-        return self.state, reward, completion, {}
+            self.end_stable = reward > 0
+            self.avg_action_magnitude = sum(self.action_magnitudes)/len(self.action_magnitudes)
+        return new_state, reward, completion, {}
 
     def reset_exp(self):
         '''Restarts the rollout process for a given experiment'''
@@ -89,21 +95,28 @@ class KEstimationEnv(gym.Env):
 
     def update_state(self, new_state):
         '''Keep internal track of the state for plotting purposes'''
-        start = self.timestep * self.dim
-        for idx in range(self.dim):
-            self.state[start + idx] = new_state[idx]
+        if self.use_lstm:
+            self.state = new_state
+        else:
+            start = self.timestep * self.dim
+            for idx in range(self.dim):
+                self.state[start + idx] = new_state[idx]
 
     def update_action(self, action):
         '''Keep internal track of the action for plotting purposes'''
-        start = self.action_offset + self.timestep * self.dim
-        for idx in range(self.dim):
-            self.state[start + idx] = action[idx]
+        if not self.use_lstm:
+            start = self.action_offset + self.timestep * self.dim
+            for idx in range(self.dim):
+                self.state[start + idx] = action[idx]
 
     def create_state(self):
         '''Initialize the zero padded state of the system'''
-        self.state = [0 for _ in range(self.action_offset +
-                                       (self.params["horizon"] + 1) * self.dim)] + \
-                     [self.exp_length, self.num_exp]
+        if not self.use_lstm:
+            self.state = [0 for _ in range(self.action_offset +
+                                          (self.params["horizon"] + 1) * self.dim)] + \
+                         [self.exp_length, self.num_exp]
+        else:
+            self.state = np.zeros(self.dim)
 
     def reset(self):
         '''Reset the A and B matrices, reset the state matrix'''
